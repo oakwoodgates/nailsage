@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from pydantic import Field, field_validator
 
-from nailsage.config.base import BaseConfig
+from config.base import BaseConfig
 
 
 class DataFormat(str, Enum):

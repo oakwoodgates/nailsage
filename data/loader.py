@@ -6,9 +6,9 @@ from typing import Optional
 import pandas as pd
 import pyarrow.parquet as pq
 
-from nailsage.config.data import DataConfig, DataFormat
-from nailsage.data.schemas import OHLCVSchema
-from nailsage.utils.logger import get_data_logger
+from config.data import DataConfig, DataFormat
+from data.schemas import OHLCVSchema
+from utils.logger import get_data_logger
 
 logger = get_data_logger()
 

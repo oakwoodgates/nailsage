@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from nailsage.config.base import BaseConfig
+from config.base import BaseConfig
 
 
 class FeatureConfig(BaseConfig):

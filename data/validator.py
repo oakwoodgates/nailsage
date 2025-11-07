@@ -6,9 +6,9 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from nailsage.config.data import DataConfig
-from nailsage.data.schemas import DataQualityIssue, DataQualityReport
-from nailsage.utils.logger import get_data_logger
+from config.data import DataConfig
+from data.schemas import DataQualityIssue, DataQualityReport
+from utils.logger import get_data_logger
 
 logger = get_data_logger()
 

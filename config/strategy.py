@@ -5,9 +5,9 @@ from typing import Optional
 
 from pydantic import Field, field_validator
 
-from nailsage.config.base import BaseConfig
-from nailsage.config.data import DataConfig
-from nailsage.config.feature import FeatureConfig
+from config.base import BaseConfig
+from config.data import DataConfig
+from config.feature import FeatureConfig
 
 
 class TargetType(str, Enum):
