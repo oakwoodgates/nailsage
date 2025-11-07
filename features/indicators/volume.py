@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from nailsage.features.base import BaseIndicator
+from features.base import BaseIndicator
 
 
 class VolumeMA(BaseIndicator):

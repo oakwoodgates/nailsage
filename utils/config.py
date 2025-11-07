@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Type, TypeVar
 
-from nailsage.config.backtest import BacktestConfig
-from nailsage.config.risk import RiskConfig
-from nailsage.config.strategy import StrategyConfig
+from config.backtest import BacktestConfig
+from config.risk import RiskConfig
+from config.strategy import StrategyConfig
 
 T = TypeVar("T")
 
@@ -116,7 +116,7 @@ def load_config(path: Path | str, config_class: Type[T]) -> T:
         Loaded and validated configuration instance
 
     Example:
-        >>> from nailsage.config.strategy import StrategyConfig
+        >>> from config.strategy import StrategyConfig
         >>> config = load_config("configs/my_strategy.yaml", StrategyConfig)
     """
     return config_class.from_yaml(path)

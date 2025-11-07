@@ -7,13 +7,13 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from nailsage.config.feature import FeatureConfig
-from nailsage.features.base import BaseIndicator
-from nailsage.features.indicators.moving_average import SMA, EMA
-from nailsage.features.indicators.momentum import RSI, MACD, ROC
-from nailsage.features.indicators.volatility import BollingerBands, ATR
-from nailsage.features.indicators.volume import VolumeMA
-from nailsage.utils.logger import get_features_logger
+from config.feature import FeatureConfig
+from features.base import BaseIndicator
+from features.indicators.moving_average import SMA, EMA
+from features.indicators.momentum import RSI, MACD, ROC
+from features.indicators.volatility import BollingerBands, ATR
+from features.indicators.volume import VolumeMA
+from utils.logger import get_features_logger
 
 logger = get_features_logger()
 

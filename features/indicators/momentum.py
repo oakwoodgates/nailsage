@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 
-from nailsage.features.base import BaseIndicator
+from features.base import BaseIndicator
 
 
 class RSI(BaseIndicator):
