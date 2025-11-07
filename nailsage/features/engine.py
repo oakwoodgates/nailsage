@@ -1,0 +1,255 @@
+"""Feature engineering engine for computing technical indicators."""
+
+import hashlib
+import pickle
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import pandas as pd
+
+from nailsage.config.feature import FeatureConfig
+from nailsage.features.base import BaseIndicator
+from nailsage.features.indicators.moving_average import SMA, EMA
+from nailsage.features.indicators.momentum import RSI, MACD, ROC
+from nailsage.features.indicators.volatility import BollingerBands, ATR
+from nailsage.features.indicators.volume import VolumeMA
+from nailsage.utils.logger import get_features_logger
+
+logger = get_features_logger()
+
+
+class FeatureEngine:
+    """
+    Feature engineering engine that computes technical indicators.
+
+    Supports:
+    - Dynamic computation based on configuration
+    - Feature caching for performance
+    - Lookback-aware calculations
+    - Multiple indicators in parallel
+    """
+
+    def __init__(self, config: FeatureConfig):
+        """
+        Initialize FeatureEngine.
+
+        Args:
+            config: Feature configuration
+        """
+        self.config = config
+        self.indicators: List[BaseIndicator] = []
+        self._initialize_indicators()
+
+        logger.info(
+            f"Initialized FeatureEngine with {len(self.indicators)} indicators",
+            extra_data={"cache_enabled": config.enable_cache},
+        )
+
+    def _initialize_indicators(self):
+        """Initialize indicators based on configuration."""
+        # Simple Moving Averages
+        for window in self.config.sma_windows:
+            self.indicators.append(SMA(window=window))
+
+        # Exponential Moving Averages
+        for window in self.config.ema_windows:
+            self.indicators.append(EMA(window=window))
+
+        # RSI
+        self.indicators.append(RSI(window=self.config.rsi_window))
+
+        # MACD
+        self.indicators.append(
+            MACD(
+                fast=self.config.macd_fast,
+                slow=self.config.macd_slow,
+                signal=self.config.macd_signal,
+            )
+        )
+
+        # Bollinger Bands
+        self.indicators.append(
+            BollingerBands(window=self.config.bb_window, num_std=self.config.bb_std)
+        )
+
+        # ATR
+        self.indicators.append(ATR(window=self.config.atr_window))
+
+        # Volume MA
+        self.indicators.append(VolumeMA(window=self.config.volume_ma_window))
+
+        # Rate of Change
+        self.indicators.append(ROC(window=self.config.roc_window))
+
+    def compute_features(
+        self,
+        df: pd.DataFrame,
+        use_cache: Optional[bool] = None,
+    ) -> pd.DataFrame:
+        """
+        Compute all features for given DataFrame.
+
+        Args:
+            df: DataFrame with OHLCV data
+            use_cache: Override cache setting (None = use config default)
+
+        Returns:
+            DataFrame with all feature columns added
+        """
+        if len(df) == 0:
+            logger.warning("Empty DataFrame provided to compute_features")
+            return df
+
+        use_cache = use_cache if use_cache is not None else self.config.enable_cache
+
+        # Check cache
+        if use_cache:
+            cache_key = self._get_cache_key(df)
+            cached_df = self._load_from_cache(cache_key)
+            if cached_df is not None:
+                logger.info("Loaded features from cache")
+                return cached_df
+
+        logger.info(f"Computing features for {len(df):,} rows")
+
+        # Make a copy to avoid modifying original
+        result_df = df.copy()
+
+        # Compute each indicator
+        for indicator in self.indicators:
+            try:
+                result_df = indicator.calculate(result_df)
+            except Exception as e:
+                logger.error(
+                    f"Failed to compute indicator '{indicator.name}': {e}",
+                    extra_data={"indicator": str(indicator)},
+                )
+                # Continue with other indicators
+                continue
+
+        # Save to cache
+        if use_cache:
+            self._save_to_cache(cache_key, result_df)
+
+        feature_cols = [col for col in result_df.columns if col not in df.columns]
+        logger.info(f"Computed {len(feature_cols)} feature columns")
+
+        return result_df
+
+    def get_feature_names(self) -> List[str]:
+        """
+        Get list of feature names that will be generated.
+
+        Returns:
+            List of feature column names
+        """
+        # This is a simplified version - actual names depend on indicator implementation
+        feature_names = []
+
+        for indicator in self.indicators:
+            # Most indicators use their name as the column prefix
+            feature_names.append(indicator.name)
+
+        return feature_names
+
+    def get_max_lookback(self) -> int:
+        """
+        Get the maximum lookback period needed across all indicators.
+
+        Returns:
+            Maximum lookback period in bars
+        """
+        if not self.indicators:
+            return self.config.max_lookback
+
+        lookbacks = [ind.get_lookback_period() for ind in self.indicators]
+        return max(lookbacks + [self.config.max_lookback])
+
+    def _get_cache_key(self, df: pd.DataFrame) -> str:
+        """
+        Generate cache key based on data and configuration.
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            Cache key string
+        """
+        # Hash based on: data shape, first/last timestamp, config
+        key_parts = [
+            str(len(df)),
+            str(df.index[0]) if len(df) > 0 else "",
+            str(df.index[-1]) if len(df) > 0 else "",
+            str(self.config.model_dump()),
+        ]
+
+        key_string = "_".join(key_parts)
+        hash_key = hashlib.md5(key_string.encode()).hexdigest()
+
+        return hash_key
+
+    def _load_from_cache(self, cache_key: str) -> Optional[pd.DataFrame]:
+        """
+        Load features from cache.
+
+        Args:
+            cache_key: Cache key
+
+        Returns:
+            Cached DataFrame or None if not found
+        """
+        if not self.config.enable_cache:
+            return None
+
+        cache_file = self.config.cache_dir / f"{cache_key}.pkl"
+
+        if not cache_file.exists():
+            return None
+
+        try:
+            with open(cache_file, "rb") as f:
+                df = pickle.load(f)
+            return df
+        except Exception as e:
+            logger.warning(f"Failed to load from cache: {e}")
+            return None
+
+    def _save_to_cache(self, cache_key: str, df: pd.DataFrame):
+        """
+        Save features to cache.
+
+        Args:
+            cache_key: Cache key
+            df: DataFrame to cache
+        """
+        if not self.config.enable_cache:
+            return
+
+        cache_dir = Path(self.config.cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        cache_file = cache_dir / f"{cache_key}.pkl"
+
+        try:
+            with open(cache_file, "wb") as f:
+                pickle.dump(df, f)
+        except Exception as e:
+            logger.warning(f"Failed to save to cache: {e}")
+
+    def clear_cache(self):
+        """Clear all cached features."""
+        if not self.config.enable_cache:
+            return
+
+        cache_dir = Path(self.config.cache_dir)
+        if not cache_dir.exists():
+            return
+
+        cache_files = list(cache_dir.glob("*.pkl"))
+        for cache_file in cache_files:
+            try:
+                cache_file.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to delete cache file {cache_file}: {e}")
+
+        logger.info(f"Cleared {len(cache_files)} cached feature files")
