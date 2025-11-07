@@ -94,12 +94,13 @@ all = [
 ]
 
 [project.scripts]
-nailsage = "nailsage.cli:main"
+# CLI entry point (to be implemented)
+# nailsage = "cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["nailsage*"]
-exclude = ["tests*", "experiments*", "data*", "models*"]
+include = ["config*", "data*", "features*", "strategies*", "validation*", "models*", "execution*", "utils*"]
+exclude = ["tests*", "experiments*", "scripts*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -107,7 +108,7 @@ addopts = [
     "-ra",
     "-q",
     "--strict-markers",
-    "--cov=nailsage",
+    "--cov=.",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -132,11 +133,14 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["nailsage"]
+source = ["."]
 omit = [
     "*/tests/*",
     "*/experiments/*",
     "*/__init__.py",
+    "data/*",
+    "logs/*",
+    "scripts/*",
 ]
 
 [tool.coverage.report]
