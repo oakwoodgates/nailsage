@@ -1,7 +1,7 @@
 """Model training, management, and registry."""
 
-from nailsage.models.registry import ModelRegistry
-from nailsage.models.trainer import BaseTrainer
+from models.registry import ModelRegistry
+from models.trainer import BaseTrainer
 
 __all__ = [
     "ModelRegistry",
