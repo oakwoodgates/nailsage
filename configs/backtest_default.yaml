@@ -1,0 +1,23 @@
+# Default Backtesting Configuration
+
+# Initial capital
+initial_capital: 10000.0
+
+# Transaction costs
+maker_fee: 0.0002  # 0.02%
+taker_fee: 0.0004  # 0.04%
+assume_maker: false  # Conservative: assume taker fees
+
+# Slippage
+slippage_bps: 2.0  # 2 basis points
+
+# Leverage (disabled for spot)
+enable_leverage: false
+max_leverage: 1.0
+funding_rate_annual: 0.0
+
+# Execution
+fill_assumption: close
+
+# Position sizing
+max_position_size: 1.0  # 100% of capital (no leverage)
