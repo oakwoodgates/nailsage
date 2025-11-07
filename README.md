@@ -29,6 +29,7 @@ Raw OHLCV Data → Feature Engine → ML Models → Portfolio Manager → Execut
 2. Multi-Strategy Support
 - Short-term strategies: 5min-1hr horizons, high leverage, technical patterns
 - Long-term strategies: 1day-1week horizons, fundamental + technical factors
+- Ability to add any strategy - delta neutral, moon phase, type 5, 6, 7, etc.
 - Portfolio-level coordination between strategies
 
 3. Validation Framework
@@ -53,10 +54,11 @@ ml_trading_research/
 │   │   ├── train.py
 │   │   ├── backtest.py
 │   │   └── config.yaml
-│   └── long_term/           # Swing strategies (multi-day holds)
-│       ├── train.py
-│       ├── backtest.py
-│       └── config.yaml
+│   ├── long_term/           # Swing strategies (multi-day holds)
+│   │   ├── train.py
+│   │   ├── backtest.py
+│   │   └── config.yaml
+|   └── ...
 ├── 📁 validation/
 │   ├── walk_forward.py      # Time-series validation
 │   ├── backtest_engine.py   # Realistic backtesting with costs
