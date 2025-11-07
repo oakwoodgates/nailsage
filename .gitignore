@@ -205,3 +205,55 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# NailSage Project-Specific
+
+# Data directories (keep structure but ignore content)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model artifacts
+models/trained/*
+models/metadata/*
+!models/trained/.gitkeep
+!models/metadata/.gitkeep
+
+# Experiment results
+experiments/*.html
+experiments/*.png
+experiments/*.pkl
+experiments/*.joblib
+experiments/results/
+
+# Feature cache
+features/cache/*
+!features/cache/.gitkeep
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Large data files (except test fixtures)
+*.parquet
+*.csv
+!tests/fixtures/*.csv
+!tests/fixtures/*.parquet
+
+# Secrets and credentials
+*secret*
+*credentials*
+*.key
+*.pem
+
+# Logs
+logs/
+*.log.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
