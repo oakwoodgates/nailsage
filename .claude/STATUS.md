@@ -1,8 +1,8 @@
 # NailSage - Current Status
 
-**Last Updated**: 2025-11-07
-**Phase**: Core Framework Complete
-**Progress**: 15/24 milestones (62.5%)
+**Last Updated**: 2025-11-08
+**Phase**: Core Framework Complete + Metadata System
+**Progress**: 16/25 milestones (64%)
 
 ## ✅ Completed Milestones
 
@@ -42,6 +42,14 @@
    - BacktestEngine (fees, slippage, leverage)
    - PerformanceMetrics (Sharpe, Sortino, Calmar, drawdown, win rate)
 
+8. **Data Metadata Tracking System** ✨ NEW
+   - DatasetMetadata dataclass with full provenance tracking
+   - Metadata generation CLI script (auto-extract from filenames)
+   - Support for multiple filename formats
+   - Data quality integration (saves quality scores)
+   - Read-only validation (never modifies source data)
+   - Tested with 120 days of Binance BTC/USDT perps data
+
 ## 🔄 In Progress
 
 None - ready for next phase!
@@ -49,42 +57,52 @@ None - ready for next phase!
 ## 📋 Remaining Milestones
 
 ### High Priority (Next Up)
-8. **First Strategy Implementation** (BTC spot, 15min, short-term)
-9. **Second Strategy** (for modularity proof)
+9. **Model Registry & Metadata** (track trained models with dataset provenance)
+10. **First Strategy Implementation** (BTC perps, 1m→15m resampling, momentum-based)
+11. **Second Strategy** (for modularity proof)
 
 ### Medium Priority
-10. **MVP PortfolioCoordinator** (simple pass-through)
-11. **State Persistence** (SQLite)
-12. **Paper Trading** Integration
+12. **MVP PortfolioCoordinator** (simple pass-through)
+13. **State Persistence** (SQLite)
+14. **Paper Trading** Integration
 
 ### Infrastructure
-13. **Docker** Containerization
-14. **Digital Ocean** Deployment scripts
-15. **Testing** (80%+ coverage)
-16. **Documentation** (README, ARCHITECTURE, DEPLOYMENT)
+15. **Docker** Containerization
+16. **Digital Ocean** Deployment scripts
+17. **Testing** (80%+ coverage)
+18. **Documentation** (README, ARCHITECTURE, DEPLOYMENT)
 
 ## 📊 Code Statistics
 
-- **Total Python Files**: 30+
-- **Lines of Code**: ~4,000
+- **Total Python Files**: 32
+- **Lines of Code**: ~4,200
 - **Modules**: 8 (config, data, features, validation, strategies, models, execution, utils)
 - **Indicators**: 8
 - **Config Models**: 6
+- **Scripts**: 1 (metadata generation)
 - **Test Coverage**: 0% (tests not yet written)
 
 ## 🎯 Next Actions
 
-**Immediate**: Implement first end-to-end strategy
-- Need sample BTC OHLCV data (Parquet/CSV)
-- Will use XGBoost for initial model
-- Target: 3-class classification (long/short/neutral)
-- Timeframe: 15-minute bars
+**Immediate**: Build Model Registry System
+- Track trained models with dataset metadata linkage
+- Store model metadata (hyperparameters, training data, performance)
+- Link to DatasetMetadata for full reproducibility
+- Save/load functionality for model artifacts
 
-**Data Requirements**:
-- Minimum 1 year of BTC/USD OHLCV data
-- 1-minute granularity (will resample to 15min)
-- Columns: timestamp, open, high, low, close, volume
-- Format: Parquet preferred, CSV acceptable
+**After Model Registry**: First Strategy Implementation
+- Use existing 120 days of Binance BTC/USDT perps data (1m bars)
+- Resample 1m → 15m for strategy training
+- XGBoost for initial model
+- Target: 3-class classification (long/short/neutral)
+- Momentum-based features (RSI, MACD, ROC)
+
+**Data Available** ✅:
+- 172,756 bars of BTC/USDT perps (1m interval)
+- Date range: July 11 - Nov 8, 2025 (~120 days)
+- Quality score: 99.94%
+- Format: Parquet
+- Metadata: Generated and validated
 
 ## 🔧 Technical Debt / Known Issues
 

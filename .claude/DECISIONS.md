@@ -221,6 +221,36 @@
 
 ---
 
+## ADR-011: Dataset Metadata Tracking for Reproducibility
+**Date**: 2025-11-08
+**Status**: Accepted
+
+**Context**: Need to track full provenance of training data to ensure model reproducibility. When a model is trained on specific data, we must be able to identify exactly which dataset, time range, exchange, and quality metrics were used.
+
+**Decision**: Implement comprehensive dataset metadata tracking with `DatasetMetadata` dataclass and CLI generation tool.
+
+**Rationale**:
+- Full reproducibility requires knowing exact data used for training
+- Quality metrics at dataset level prevent using low-quality data unknowingly
+- Filename-based auto-extraction reduces manual metadata entry
+- JSON format allows easy programmatic access and human readability
+- Linking models to dataset metadata creates complete audit trail
+- Read-only validation ensures source data integrity
+
+**Consequences**:
+- Every dataset in `data/raw/` should have accompanying `.metadata.json` file
+- Model registry must reference dataset metadata for full provenance
+- Filename conventions should follow pattern: `{exchange}_{asset}_{quote}_{market_type}_{interval}.ext`
+- CLI tool makes metadata generation easy and consistent
+- Metadata files tracked in git for versioning
+
+**Implementation**:
+- `data/metadata.py`: DatasetMetadata dataclass
+- `scripts/generate_data_metadata.py`: CLI tool for metadata generation
+- `data/loader.py`: Enhanced with column name normalization
+
+---
+
 ## Template for New Decisions
 
 ```markdown

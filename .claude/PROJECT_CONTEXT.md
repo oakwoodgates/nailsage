@@ -100,6 +100,7 @@ nailsage/                      # Project root
 │   ├── loader.py             # DataLoader class
 │   ├── validator.py          # DataValidator class
 │   ├── schemas.py            # Data schemas
+│   ├── metadata.py           # DatasetMetadata class
 │   ├── raw/                  # Raw OHLCV data (Parquet/CSV)
 │   └── processed/            # Processed datasets
 ├── features/                  # Feature engineering
@@ -129,6 +130,7 @@ nailsage/                      # Project root
 ├── tests/                     # Test suite
 ├── experiments/               # Jupyter notebooks
 └── scripts/                   # Helper scripts
+    └── generate_data_metadata.py  # CLI for metadata generation
 ```
 
 ## Completed Components (Phase 1)
@@ -168,10 +170,17 @@ nailsage/                      # Project root
 - Overfitting detection (train vs validation gap analysis)
 - Aggregate metrics and consistency scoring
 
+### ✅ Data Metadata Tracking
+- DatasetMetadata: Complete provenance tracking (asset, quote, exchange, market type, interval)
+- Metadata generation CLI: Auto-extract from filenames, validate data quality
+- Flexible filename parsing: Handles multiple formats and prefixes
+- Read-only validation: Never modifies source data files
+- Quality metrics integration: Stores data quality scores with metadata
+
 ## Current Status
-**Phase**: Core Framework Complete (15/24 milestones)
-**Lines of Code**: ~4,000+ (production-ready)
-**Next Milestone**: First end-to-end strategy implementation
+**Phase**: Core Framework Complete + Metadata System (16/25 milestones)
+**Lines of Code**: ~4,200+ (production-ready)
+**Next Milestone**: Model registry & metadata tracking system
 
 ## Ready to Implement
 With the foundation complete, we can now:
