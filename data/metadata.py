@@ -85,6 +85,19 @@ class DatasetMetadata:
         return cls(**data)
 
     @classmethod
+    def load(cls, path: Path | str) -> "DatasetMetadata":
+        """
+        Load metadata from JSON file (alias for from_json).
+
+        Args:
+            path: Path to JSON file
+
+        Returns:
+            DatasetMetadata instance
+        """
+        return cls.from_json(path)
+
+    @classmethod
     def from_dataframe(
         cls,
         df: pd.DataFrame,

@@ -1,9 +1,19 @@
 """Model training, management, and registry."""
 
+from models.metadata import ModelMetadata
 from models.registry import ModelRegistry
-from models.trainer import BaseTrainer
+from models.utils import (
+    compare_models,
+    create_model_metadata,
+    generate_model_id,
+    get_model_lineage,
+)
 
 __all__ = [
+    "ModelMetadata",
     "ModelRegistry",
-    "BaseTrainer",
+    "create_model_metadata",
+    "generate_model_id",
+    "compare_models",
+    "get_model_lineage",
 ]
