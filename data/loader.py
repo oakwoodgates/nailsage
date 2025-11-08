@@ -107,6 +107,33 @@ class DataLoader:
 
         return df
 
+    def _normalize_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Normalize column names to match expected schema.
+
+        Handles common variations like 'time' vs 'timestamp'.
+
+        Args:
+            df: DataFrame with potentially non-standard column names
+
+        Returns:
+            DataFrame with normalized column names
+        """
+        df = df.copy()
+
+        # Common timestamp column variations
+        timestamp_variations = ['time', 'datetime', 'dt', 'date']
+        expected_timestamp = self.config.timestamp_column
+
+        if expected_timestamp not in df.columns:
+            for var in timestamp_variations:
+                if var in df.columns:
+                    logger.info(f"Renaming column '{var}' to '{expected_timestamp}'")
+                    df = df.rename(columns={var: expected_timestamp})
+                    break
+
+        return df
+
     def _get_default_filename(self) -> str:
         """
         Get default filename based on symbol.
@@ -138,6 +165,10 @@ class DataLoader:
         """
         try:
             df = pd.read_parquet(file_path)
+
+            # Auto-detect and rename common timestamp column variations
+            df = self._normalize_column_names(df)
+
             return df
         except Exception as e:
             logger.error(f"Failed to load Parquet file: {e}", extra_data={"path": str(file_path)})
@@ -155,6 +186,10 @@ class DataLoader:
         """
         try:
             df = pd.read_csv(file_path)
+
+            # Auto-detect and rename common timestamp column variations
+            df = self._normalize_column_names(df)
+
             return df
         except Exception as e:
             logger.error(f"Failed to load CSV file: {e}", extra_data={"path": str(file_path)})
