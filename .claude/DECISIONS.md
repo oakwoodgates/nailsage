@@ -251,6 +251,39 @@
 
 ---
 
+## ADR-012: Centralized Model Registry with Metadata Linkage
+**Date**: 2025-11-08
+**Status**: Accepted
+
+**Context**: Need to manage multiple trained models across different strategies, versions, and datasets. Must support querying models by various criteria (strategy, performance, dataset characteristics) and maintain complete provenance for reproducibility.
+
+**Decision**: Implement centralized `ModelRegistry` with hash-based model IDs and comprehensive metadata tracking that links to dataset metadata.
+
+**Rationale**:
+- Centralized storage (`models/trained/`, `models/metadata/`) separates model artifacts from strategy code
+- Hash-based IDs provide deterministic identification based on training configuration
+- Linking ModelMetadata → DatasetMetadata creates complete audit trail
+- Flexible querying enables finding models by strategy, timeframe, performance metrics, or dataset characteristics
+- Supports multiple strategies using same underlying registry infrastructure
+- Model comparison and lineage tracking built-in
+- Independent of strategy directory structure (modular)
+
+**Consequences**:
+- All trained models stored centrally, not in strategy subdirectories
+- Model ID generation is deterministic (same config + data = same ID)
+- Strategy configs reference models via registry queries (e.g., `get_latest_model("ema_cross_rsi")`)
+- Complete reproducibility: model → training data → data quality → raw source file
+- Easy to compare models, track performance evolution, and manage versions
+- Registry can be extended with SQLite index for faster queries at scale
+
+**Implementation**:
+- `models/metadata.py`: ModelMetadata dataclass
+- `models/registry.py`: ModelRegistry class with save/load/query
+- `models/utils.py`: Helper functions for metadata generation and comparison
+- `scripts/test_model_registry.py`: Demonstration and testing
+
+---
+
 ## Template for New Decisions
 
 ```markdown

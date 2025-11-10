@@ -1,8 +1,8 @@
 # NailSage - Current Status
 
 **Last Updated**: 2025-11-08
-**Phase**: Core Framework Complete + Metadata System
-**Progress**: 16/25 milestones (64%)
+**Phase**: Core Framework Complete + Metadata & Registry
+**Progress**: 17/25 milestones (68%)
 
 ## ✅ Completed Milestones
 
@@ -42,7 +42,7 @@
    - BacktestEngine (fees, slippage, leverage)
    - PerformanceMetrics (Sharpe, Sortino, Calmar, drawdown, win rate)
 
-8. **Data Metadata Tracking System** ✨ NEW
+8. **Data Metadata Tracking System**
    - DatasetMetadata dataclass with full provenance tracking
    - Metadata generation CLI script (auto-extract from filenames)
    - Support for multiple filename formats
@@ -50,47 +50,51 @@
    - Read-only validation (never modifies source data)
    - Tested with 120 days of Binance BTC/USDT perps data
 
+9. **Model Registry & Metadata System** ✨ NEW
+   - ModelMetadata dataclass with complete provenance
+   - ModelRegistry with centralized storage and querying
+   - Query by strategy, timeframe, version, metrics, asset, date ranges
+   - Model comparison and performance tracking
+   - Complete lineage tracking (data → features → model → metrics)
+   - Utility functions for metadata generation
+   - Links models to dataset metadata for full reproducibility
+   - Tested with demonstration script
+
 ## 🔄 In Progress
 
-None - ready for next phase!
+None - ready for first strategy implementation!
 
 ## 📋 Remaining Milestones
 
 ### High Priority (Next Up)
-9. **Model Registry & Metadata** (track trained models with dataset provenance)
 10. **First Strategy Implementation** (BTC perps, 1m→15m resampling, momentum-based)
 11. **Second Strategy** (for modularity proof)
+12. **Unit Tests** (core modules: data, features, validation, models)
 
 ### Medium Priority
-12. **MVP PortfolioCoordinator** (simple pass-through)
-13. **State Persistence** (SQLite)
-14. **Paper Trading** Integration
+13. **MVP PortfolioCoordinator** (simple pass-through)
+14. **State Persistence** (SQLite)
+15. **Paper Trading** Integration
 
 ### Infrastructure
-15. **Docker** Containerization
-16. **Digital Ocean** Deployment scripts
-17. **Testing** (80%+ coverage)
-18. **Documentation** (README, ARCHITECTURE, DEPLOYMENT)
+16. **Docker** Containerization
+17. **Digital Ocean** Deployment scripts
+18. **Achieve 80%+ test coverage**
+19. **Comprehensive Documentation** (README, ARCHITECTURE, DEPLOYMENT)
 
 ## 📊 Code Statistics
 
-- **Total Python Files**: 32
-- **Lines of Code**: ~4,200
+- **Total Python Files**: 35
+- **Lines of Code**: ~5,000
 - **Modules**: 8 (config, data, features, validation, strategies, models, execution, utils)
 - **Indicators**: 8
 - **Config Models**: 6
-- **Scripts**: 1 (metadata generation)
-- **Test Coverage**: 0% (tests not yet written)
+- **Scripts**: 2 (metadata generation, model registry test)
+- **Test Coverage**: 0% (tests ready to write)
 
 ## 🎯 Next Actions
 
-**Immediate**: Build Model Registry System
-- Track trained models with dataset metadata linkage
-- Store model metadata (hyperparameters, training data, performance)
-- Link to DatasetMetadata for full reproducibility
-- Save/load functionality for model artifacts
-
-**After Model Registry**: First Strategy Implementation
+**Immediate**: First Strategy Implementation
 - Use existing 120 days of Binance BTC/USDT perps data (1m bars)
 - Resample 1m → 15m for strategy training
 - XGBoost for initial model

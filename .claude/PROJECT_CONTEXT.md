@@ -121,8 +121,11 @@ nailsage/                      # Project root
 │   ├── short_term/           # Short-term strategies
 │   └── long_term/            # Long-term strategies
 ├── models/                    # Model training and registry
-│   ├── trained/              # Serialized models
-│   └── metadata/             # Model metadata
+│   ├── metadata.py           # ModelMetadata dataclass
+│   ├── registry.py           # ModelRegistry class
+│   ├── utils.py              # Model utilities
+│   ├── trained/              # Serialized models (.joblib, .pkl)
+│   └── metadata/             # Model metadata JSON files
 ├── execution/                 # Execution and portfolio management
 ├── utils/                     # Utilities
 │   ├── logger.py             # Structured logging
@@ -130,7 +133,8 @@ nailsage/                      # Project root
 ├── tests/                     # Test suite
 ├── experiments/               # Jupyter notebooks
 └── scripts/                   # Helper scripts
-    └── generate_data_metadata.py  # CLI for metadata generation
+    ├── generate_data_metadata.py  # CLI for metadata generation
+    └── test_model_registry.py     # Model registry demonstration
 ```
 
 ## Completed Components (Phase 1)
@@ -177,16 +181,26 @@ nailsage/                      # Project root
 - Read-only validation: Never modifies source data files
 - Quality metrics integration: Stores data quality scores with metadata
 
+### ✅ Model Registry & Metadata
+- ModelMetadata: Complete provenance (strategy, data, features, hyperparameters, performance)
+- ModelRegistry: Centralized storage with flexible querying
+- Query models by: strategy, timeframe, version, metrics, asset, date ranges
+- Model comparison and lineage tracking
+- Links ModelMetadata → DatasetMetadata for full reproducibility
+- Utility functions for metadata generation and comparison
+
 ## Current Status
-**Phase**: Core Framework Complete + Metadata System (16/25 milestones)
-**Lines of Code**: ~4,200+ (production-ready)
-**Next Milestone**: Model registry & metadata tracking system
+**Phase**: Core Framework Complete + Metadata & Registry (17/25 milestones)
+**Lines of Code**: ~5,000+ (production-ready)
+**Next Milestone**: First strategy implementation
 
 ## Ready to Implement
 With the foundation complete, we can now:
-1. Load and validate data
-2. Compute features dynamically
-3. Split data with no leakage
-4. Train ML models
-5. Backtest with realistic costs
-6. Validate with walk-forward methodology
+1. Load and validate data (✅ with metadata tracking)
+2. Compute features dynamically (✅ 8 indicators ready)
+3. Split data with no leakage (✅ TimeSeriesSplitter)
+4. Train ML models (✅ ready for XGBoost/LightGBM)
+5. Backtest with realistic costs (✅ BacktestEngine)
+6. Validate with walk-forward methodology (✅ WalkForwardValidator)
+7. Track complete provenance (✅ Dataset + Model metadata)
+8. Query and compare models (✅ ModelRegistry)
