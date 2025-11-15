@@ -15,14 +15,14 @@ from models import (
 
 
 @pytest.mark.unit
-def test_generate_model_id_hash():
-    """Test hash-based model ID generation."""
+def test_generate_model_id_hybrid():
+    """Test hybrid model ID generation."""
     model_id1 = generate_model_id(
         strategy_name="test_strategy",
         training_dataset_path="data/test.parquet",
         training_date_range=("2025-01-01", "2025-01-31"),
         model_config={"max_depth": 5, "learning_rate": 0.01},
-        use_hash=True,
+        use_hybrid=True,
     )
 
     model_id2 = generate_model_id(
@@ -30,23 +30,34 @@ def test_generate_model_id_hash():
         training_dataset_path="data/test.parquet",
         training_date_range=("2025-01-01", "2025-01-31"),
         model_config={"max_depth": 5, "learning_rate": 0.01},
-        use_hash=True,
+        use_hybrid=True,
     )
 
-    # Same inputs should produce same hash
-    assert model_id1 == model_id2
-    assert len(model_id1) == 16  # Hash is truncated to 16 chars
+    # Both should be hybrid format
+    assert "_" in model_id1
+    assert "_" in model_id2
+
+    # Extract config hashes (first 16 chars before first underscore)
+    hash1 = model_id1.split("_")[0]
+    hash2 = model_id2.split("_")[0]
+
+    # Same config should produce same hash
+    assert hash1 == hash2
+    assert len(hash1) == 16  # Config hash is 16 chars
+
+    # But full IDs should differ (different timestamps/random suffix)
+    assert model_id1 != model_id2
 
 
 @pytest.mark.unit
 def test_generate_model_id_uuid():
-    """Test UUID-based model ID generation."""
+    """Test UUID-based model ID generation (fallback)."""
     model_id1 = generate_model_id(
         strategy_name="test_strategy",
         training_dataset_path="data/test.parquet",
         training_date_range=("2025-01-01", "2025-01-31"),
         model_config={"max_depth": 5},
-        use_hash=False,
+        use_hybrid=False,  # Use UUID instead
     )
 
     model_id2 = generate_model_id(
@@ -54,7 +65,7 @@ def test_generate_model_id_uuid():
         training_dataset_path="data/test.parquet",
         training_date_range=("2025-01-01", "2025-01-31"),
         model_config={"max_depth": 5},
-        use_hash=False,
+        use_hybrid=False,
     )
 
     # UUIDs should be different
