@@ -1,11 +1,19 @@
 """Feature engineering configuration."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from config.base import BaseConfig
+
+
+class IndicatorConfig(BaseConfig):
+    """Configuration for a single indicator."""
+
+    name: str = Field(description="Indicator name (e.g., 'ema_12')")
+    type: str = Field(description="Indicator type (e.g., 'EMA', 'RSI', 'MACD')")
+    params: dict[str, Any] = Field(default_factory=dict, description="Indicator parameters")
 
 
 class FeatureConfig(BaseConfig):
@@ -16,53 +24,9 @@ class FeatureConfig(BaseConfig):
     Each strategy can have its own feature configuration.
     """
 
-    # Indicator parameters - Simple Moving Averages
-    sma_windows: List[int] = Field(
-        default=[5, 10, 20, 50, 100, 200],
-        description="Windows for Simple Moving Average",
-    )
-
-    # Exponential Moving Averages
-    ema_windows: List[int] = Field(
-        default=[9, 12, 21, 26, 50],
-        description="Windows for Exponential Moving Average",
-    )
-
-    # RSI
-    rsi_window: int = Field(
-        default=14,
-        description="Window for RSI calculation",
-        ge=2,
-    )
-
-    # MACD
-    macd_fast: int = Field(default=12, description="MACD fast period", ge=2)
-    macd_slow: int = Field(default=26, description="MACD slow period", ge=2)
-    macd_signal: int = Field(default=9, description="MACD signal period", ge=2)
-
-    # Bollinger Bands
-    bb_window: int = Field(default=20, description="Bollinger Bands window", ge=2)
-    bb_std: float = Field(
-        default=2.0,
-        description="Bollinger Bands standard deviations",
-        ge=0.1,
-    )
-
-    # ATR (Average True Range)
-    atr_window: int = Field(default=14, description="ATR window", ge=2)
-
-    # Volume indicators
-    volume_ma_window: int = Field(
-        default=20,
-        description="Volume moving average window",
-        ge=2,
-    )
-
-    # Momentum indicators
-    roc_window: int = Field(
-        default=10,
-        description="Rate of Change window",
-        ge=1,
+    # Flexible indicator list from YAML
+    indicators: List[IndicatorConfig] = Field(
+        description="List of indicators to compute",
     )
 
     # Feature caching
@@ -99,21 +63,11 @@ class FeatureConfig(BaseConfig):
         """
         windows = []
 
-        # Collect all window sizes
-        if self.sma_windows:
-            windows.extend(self.sma_windows)
-        if self.ema_windows:
-            windows.extend(self.ema_windows)
-
-        windows.extend(
-            [
-                self.rsi_window,
-                self.macd_slow,  # Slowest MACD component
-                self.bb_window,
-                self.atr_window,
-                self.volume_ma_window,
-                self.roc_window,
-            ]
-        )
+        # Extract window sizes from indicator configs
+        for ind in self.indicators:
+            if "window" in ind.params:
+                windows.append(ind.params["window"])
+            if "slow" in ind.params:
+                windows.append(ind.params["slow"])
 
         return max(windows) if windows else self.max_lookback

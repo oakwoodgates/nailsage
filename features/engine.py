@@ -47,39 +47,47 @@ class FeatureEngine:
 
     def _initialize_indicators(self):
         """Initialize indicators based on configuration."""
-        # Simple Moving Averages
-        for window in self.config.sma_windows:
-            self.indicators.append(SMA(window=window))
+        for ind_config in self.config.indicators:
+            indicator = self._create_indicator_from_config(ind_config)
+            if indicator:
+                self.indicators.append(indicator)
 
-        # Exponential Moving Averages
-        for window in self.config.ema_windows:
-            self.indicators.append(EMA(window=window))
+    def _create_indicator_from_config(self, ind_config) -> Optional[BaseIndicator]:
+        """
+        Create indicator instance from config.
 
-        # RSI
-        self.indicators.append(RSI(window=self.config.rsi_window))
+        Args:
+            ind_config: IndicatorConfig object
 
-        # MACD
-        self.indicators.append(
-            MACD(
-                fast=self.config.macd_fast,
-                slow=self.config.macd_slow,
-                signal=self.config.macd_signal,
-            )
-        )
+        Returns:
+            BaseIndicator instance or None if type not recognized
+        """
+        indicator_type = ind_config.type.upper()
+        params = ind_config.params
 
-        # Bollinger Bands
-        self.indicators.append(
-            BollingerBands(window=self.config.bb_window, num_std=self.config.bb_std)
-        )
-
-        # ATR
-        self.indicators.append(ATR(window=self.config.atr_window))
-
-        # Volume MA
-        self.indicators.append(VolumeMA(window=self.config.volume_ma_window))
-
-        # Rate of Change
-        self.indicators.append(ROC(window=self.config.roc_window))
+        try:
+            if indicator_type == "SMA":
+                return SMA(**params)
+            elif indicator_type == "EMA":
+                return EMA(**params)
+            elif indicator_type == "RSI":
+                return RSI(**params)
+            elif indicator_type == "MACD":
+                return MACD(**params)
+            elif indicator_type == "BOLLINGERBANDS":
+                return BollingerBands(**params)
+            elif indicator_type == "ATR":
+                return ATR(**params)
+            elif indicator_type == "VOLUMEMA":
+                return VolumeMA(**params)
+            elif indicator_type == "ROC":
+                return ROC(**params)
+            else:
+                logger.warning(f"Unknown indicator type: {indicator_type}")
+                return None
+        except Exception as e:
+            logger.error(f"Failed to create indicator {indicator_type}: {e}")
+            return None
 
     def compute_features(
         self,

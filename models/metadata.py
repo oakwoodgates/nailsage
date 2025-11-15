@@ -9,6 +9,18 @@ from typing import Any, Optional
 from data.metadata import DatasetMetadata
 
 
+def _convert_paths_to_strings(obj: Any) -> Any:
+    """Recursively convert Path objects to strings for JSON serialization."""
+    if isinstance(obj, Path):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {k: _convert_paths_to_strings(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_convert_paths_to_strings(item) for item in obj]
+    else:
+        return obj
+
+
 @dataclass
 class ModelMetadata:
     """
@@ -57,12 +69,12 @@ class ModelMetadata:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
+        data = {
             "model_id": self.model_id,
             "strategy_name": self.strategy_name,
             "strategy_timeframe": self.strategy_timeframe,
             "version": self.version,
-            "training_dataset_path": self.training_dataset_path,
+            "training_dataset_path": str(self.training_dataset_path),
             "training_date_range": list(self.training_date_range),
             "validation_date_range": list(self.validation_date_range),
             "model_type": self.model_type,
@@ -70,12 +82,14 @@ class ModelMetadata:
             "model_config": self.model_config,
             "target_config": self.target_config,
             "validation_metrics": self.validation_metrics,
-            "model_artifact_path": self.model_artifact_path,
+            "model_artifact_path": str(self.model_artifact_path),
             "trained_at": self.trained_at,
             "created_at": self.created_at,
             "notes": self.notes,
             "tags": self.tags,
         }
+        # Recursively convert any Path objects to strings
+        return _convert_paths_to_strings(data)
 
     @classmethod
     def from_dict(cls, data: dict) -> "ModelMetadata":

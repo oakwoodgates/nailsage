@@ -1,9 +1,10 @@
 """Strategy configuration."""
 
+from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from config.base import BaseConfig
 from config.data import DataConfig
@@ -31,6 +32,59 @@ class TimeFrame(str, Enum):
     WEEK_1 = "1w"
 
 
+class DataSection(BaseConfig):
+    """Data section of strategy config."""
+
+    source_file: str = Field(description="Path to source data file")
+    resample_interval: Optional[str] = Field(default=None, description="Resample interval (e.g., '15min')")
+    train_start: str = Field(description="Training start date (YYYY-MM-DD)")
+    train_end: str = Field(description="Training end date (YYYY-MM-DD)")
+    validation_start: str = Field(description="Validation start date (YYYY-MM-DD)")
+    validation_end: str = Field(description="Validation end date (YYYY-MM-DD)")
+
+
+class TargetSection(BaseConfig):
+    """Target section of strategy config."""
+
+    type: str = Field(description="Target type (classification/regression)")
+    classes: Optional[int] = Field(default=None, description="Number of classes for classification")
+    lookahead_bars: int = Field(default=1, description="Bars to look ahead", ge=1)
+    threshold_pct: float = Field(default=0.5, description="Threshold percentage", gt=0.0)
+
+
+class ModelSection(BaseConfig):
+    """Model section of strategy config."""
+
+    type: str = Field(description="Model type (xgboost, lightgbm, etc.)")
+    params: dict[str, Any] = Field(default_factory=dict, description="Model hyperparameters")
+
+
+class ValidationSection(BaseConfig):
+    """Validation section of strategy config."""
+
+    method: str = Field(default="walk_forward", description="Validation method")
+    n_splits: int = Field(default=4, description="Number of splits", ge=2)
+    expanding_window: bool = Field(default=True, description="Use expanding window")
+    gap_bars: int = Field(default=0, description="Gap bars between splits", ge=0)
+
+
+class BacktestSection(BaseConfig):
+    """Backtest section of strategy config."""
+
+    transaction_cost_pct: float = Field(default=0.04, description="Transaction cost %", ge=0.0)
+    slippage_bps: int = Field(default=2, description="Slippage in basis points", ge=0)
+    leverage: int = Field(default=1, description="Leverage", ge=1)
+    capital: float = Field(default=10000, description="Starting capital", gt=0.0)
+
+
+class RiskSection(BaseConfig):
+    """Risk section of strategy config."""
+
+    max_position_size_pct: float = Field(default=100, description="Max position size %", gt=0.0)
+    stop_loss_pct: float = Field(default=2.0, description="Stop loss %", gt=0.0)
+    take_profit_pct: float = Field(default=3.0, description="Take profit %", gt=0.0)
+
+
 class StrategyConfig(BaseConfig):
     """
     Configuration for a trading strategy.
@@ -40,131 +94,126 @@ class StrategyConfig(BaseConfig):
     """
 
     # Strategy identification
-    name: str = Field(
-        description="Strategy name (e.g., 'btc_spot_short_term')",
+    strategy_name: str = Field(
+        description="Strategy name (e.g., 'momentum_classifier')",
+    )
+    version: str = Field(
+        description="Strategy version (e.g., 'v1')",
+    )
+    strategy_timeframe: str = Field(
+        description="Strategy timeframe category (short_term, medium_term, long_term)",
     )
     description: Optional[str] = Field(
         default=None,
         description="Strategy description",
     )
 
-    # Data configuration
-    data: DataConfig = Field(
-        description="Data loading and validation configuration",
+    # Main sections
+    data: DataSection = Field(
+        description="Data configuration",
     )
-
-    # Feature configuration
     features: FeatureConfig = Field(
         description="Feature engineering configuration",
     )
-
-    # Timeframe
-    timeframe: TimeFrame = Field(
-        description="Trading timeframe (e.g., '15m', '1h', '1d')",
+    target: TargetSection = Field(
+        description="Target variable configuration",
     )
-
-    # Target definition
-    target_type: TargetType = Field(
-        default=TargetType.CLASSIFICATION_3CLASS,
-        description="Type of prediction target",
+    model: ModelSection = Field(
+        description="Model configuration",
     )
-    target_horizon_bars: int = Field(
-        default=1,
-        description="Number of bars ahead to predict",
-        ge=1,
-    )
-    target_threshold: float = Field(
-        default=0.005,  # 0.5%
-        description="Threshold for classification (e.g., 0.5% move)",
-        gt=0.0,
-    )
-    neutral_zone: Optional[float] = Field(
+    validation: Optional[ValidationSection] = Field(
         default=None,
-        description="Neutral zone threshold (for 3-class). If None, uses target_threshold",
-        gt=0.0,
+        description="Validation configuration",
     )
-
-    # Model parameters
-    model_type: str = Field(
-        default="xgboost",
-        description="Model type (xgboost, lightgbm, random_forest)",
-    )
-    model_params: Optional[dict] = Field(
+    backtest: Optional[BacktestSection] = Field(
         default=None,
-        description="Model-specific hyperparameters",
+        description="Backtest configuration",
+    )
+    risk: Optional[RiskSection] = Field(
+        default=None,
+        description="Risk management configuration",
     )
 
-    # Training parameters
-    train_test_split_ratio: float = Field(
-        default=0.7,
-        description="Ratio of data to use for training vs testing",
-        gt=0.0,
-        lt=1.0,
-    )
-    validation_windows: int = Field(
-        default=5,
-        description="Number of walk-forward validation windows",
-        ge=1,
-    )
-
-    @field_validator("name")
+    @field_validator("strategy_name")
     @classmethod
-    def validate_name(cls, v: str) -> str:
+    def validate_strategy_name(cls, v: str) -> str:
         """Validate strategy name format."""
         if not v or len(v) < 3:
             raise ValueError("Strategy name must be at least 3 characters")
         # Convert to lowercase with underscores
         return v.lower().replace("-", "_").replace(" ", "_")
 
-    @field_validator("neutral_zone")
+    @field_validator("version")
     @classmethod
-    def validate_neutral_zone(cls, v: Optional[float], info) -> Optional[float]:
-        """Validate neutral zone is smaller than target threshold."""
-        if v is not None:
-            target_threshold = info.data.get("target_threshold")
-            if target_threshold and v > target_threshold:
-                raise ValueError("neutral_zone must be <= target_threshold")
+    def validate_version(cls, v: str) -> str:
+        """Validate version format."""
+        if not v.startswith("v"):
+            return f"v{v}"
         return v
 
-    def get_neutral_threshold(self) -> float:
-        """
-        Get the neutral zone threshold.
+    # Helper properties for accessing nested config
+    @property
+    def data_source(self) -> str:
+        """Get data source file path."""
+        return self.data.source_file
 
-        Returns target_threshold if neutral_zone is not set.
-        """
-        return self.neutral_zone if self.neutral_zone is not None else self.target_threshold
+    @property
+    def resample_interval(self) -> Optional[str]:
+        """Get resample interval."""
+        return self.data.resample_interval
 
-    def get_model_params_with_defaults(self) -> dict:
-        """
-        Get model parameters with sensible defaults for the model type.
+    @property
+    def train_start(self) -> str:
+        """Get training start date."""
+        return self.data.train_start
 
-        Returns:
-            Dictionary of model parameters
-        """
-        defaults = {
-            "xgboost": {
-                "max_depth": 6,
-                "learning_rate": 0.1,
-                "n_estimators": 100,
-                "objective": "multi:softprob" if "classification" in self.target_type else "reg:squarederror",
-                "random_state": 42,
-            },
-            "lightgbm": {
-                "max_depth": 6,
-                "learning_rate": 0.1,
-                "n_estimators": 100,
-                "objective": "multiclass" if "classification" in self.target_type else "regression",
-                "random_state": 42,
-            },
-            "random_forest": {
-                "max_depth": 10,
-                "n_estimators": 100,
-                "random_state": 42,
-            },
-        }
+    @property
+    def train_end(self) -> str:
+        """Get training end date."""
+        return self.data.train_end
 
-        base_params = defaults.get(self.model_type, {})
-        if self.model_params:
-            base_params.update(self.model_params)
+    @property
+    def validation_start(self) -> str:
+        """Get validation start date."""
+        return self.data.validation_start
 
-        return base_params
+    @property
+    def validation_end(self) -> str:
+        """Get validation end date."""
+        return self.data.validation_end
+
+    @property
+    def target_lookahead_bars(self) -> int:
+        """Get target lookahead bars."""
+        return self.target.lookahead_bars
+
+    @property
+    def target_threshold_pct(self) -> float:
+        """Get target threshold percentage."""
+        return self.target.threshold_pct
+
+    @property
+    def model_type_str(self) -> str:
+        """Get model type as string."""
+        return self.model.type
+
+    @property
+    def model_params(self) -> dict[str, Any]:
+        """Get model parameters."""
+        return self.model.params
+
+    @property
+    def data_config(self) -> DataConfig:
+        """Get DataConfig for loader compatibility."""
+        # Create a minimal DataConfig from strategy data section
+        from pathlib import Path
+
+        return DataConfig(
+            data_dir=Path("data/raw"),
+            symbol="BTC/USDT",  # Default symbol, can be overridden
+        )
+
+    @property
+    def feature_config(self) -> FeatureConfig:
+        """Get feature configuration."""
+        return self.features
