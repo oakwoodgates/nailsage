@@ -251,36 +251,53 @@
 
 ---
 
-## ADR-012: Centralized Model Registry with Metadata Linkage
+## ADR-012: Centralized Model Registry with Hybrid ID System
 **Date**: 2025-11-08
 **Status**: Accepted
+**Updated**: 2025-11-08 (Implemented hybrid ID system)
 
-**Context**: Need to manage multiple trained models across different strategies, versions, and datasets. Must support querying models by various criteria (strategy, performance, dataset characteristics) and maintain complete provenance for reproducibility.
+**Context**: Need to manage multiple trained models across different strategies, versions, and datasets. Must support querying models by various criteria (strategy, performance, dataset characteristics) and maintain complete provenance for reproducibility. Additionally, need to track multiple training runs of the same configuration over time (audit trail).
 
-**Decision**: Implement centralized `ModelRegistry` with hash-based model IDs and comprehensive metadata tracking that links to dataset metadata.
+**Decision**: Implement centralized `ModelRegistry` with **hybrid model IDs** that encode both configuration intent and training implementation.
+
+**Hybrid ID Format**: `{config_hash}_{timestamp}_{random_suffix}`
+- Example: `2e30bea4e8f93845_20251108_153045_a3f9c2`
+- Config hash (16 chars): WHAT you're training (deterministic from hyperparameters + data)
+- Timestamp (15 chars): WHEN you trained it (YYYYMMDD_HHMMSS)
+- Random suffix (6 chars): Collision prevention for same-second training runs
 
 **Rationale**:
-- Centralized storage (`models/trained/`, `models/metadata/`) separates model artifacts from strategy code
-- Hash-based IDs provide deterministic identification based on training configuration
-- Linking ModelMetadata → DatasetMetadata creates complete audit trail
-- Flexible querying enables finding models by strategy, timeframe, performance metrics, or dataset characteristics
-- Supports multiple strategies using same underlying registry infrastructure
-- Model comparison and lineage tracking built-in
-- Independent of strategy directory structure (modular)
+- **Separates Intent from Implementation**: Config hash represents configuration intent, timestamp represents training execution
+- **Audit Trail**: Can track multiple training runs of same configuration over time
+- **Deduplication**: Config hash enables finding "similar" models without preventing retraining
+- **Chronological Ordering**: Timestamps embedded in ID for natural sorting
+- **Human-Readable**: Can see when model was trained from ID alone
+- **No Coordination Needed**: Timestamp + random suffix prevents race conditions
+- **File System Friendly**: Models naturally group by config, then sort by time
+- **Modular**: Independent of strategy directory structure
 
 **Consequences**:
-- All trained models stored centrally, not in strategy subdirectories
-- Model ID generation is deterministic (same config + data = same ID)
-- Strategy configs reference models via registry queries (e.g., `get_latest_model("ema_cross_rsi")`)
-- Complete reproducibility: model → training data → data quality → raw source file
-- Easy to compare models, track performance evolution, and manage versions
-- Registry can be extended with SQLite index for faster queries at scale
+- All trained models stored centrally in `models/trained/` and `models/metadata/`
+- Model IDs are unique per training run (no overwriting)
+- Same configuration can be trained multiple times (tracked separately)
+- Config hash enables queries like "find all runs of this config"
+- Timestamp enables queries like "latest trained model for this config"
+- File listings show chronological order automatically
+- Slightly longer IDs (38 chars) vs pure hash (16 chars) or UUID (36 chars)
+- Helper methods on ModelMetadata parse ID components:
+  - `get_config_hash()` - extract configuration hash
+  - `get_training_timestamp()` - extract when it was trained
+  - `is_hybrid_id()` - check ID format
+- ModelRegistry provides config-aware queries:
+  - `find_models_by_config(config_hash)` - all runs of a configuration
+  - `get_latest_by_config(config_hash)` - most recent run
+  - `list_config_families()` - group models by configuration
 
 **Implementation**:
-- `models/metadata.py`: ModelMetadata dataclass
-- `models/registry.py`: ModelRegistry class with save/load/query
-- `models/utils.py`: Helper functions for metadata generation and comparison
-- `scripts/test_model_registry.py`: Demonstration and testing
+- `models/metadata.py`: ModelMetadata dataclass with ID parsing helpers
+- `models/registry.py`: ModelRegistry with config-aware queries
+- `models/utils.py`: `generate_model_id()` creates hybrid IDs, `generate_config_hash()` for intent fingerprinting
+- `tests/unit/test_hybrid_ids.py`: Comprehensive tests for hybrid ID functionality
 
 ---
 
