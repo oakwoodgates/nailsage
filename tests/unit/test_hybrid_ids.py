@@ -137,6 +137,10 @@ def test_registry_get_latest_by_config(temp_models_dir):
     # Train same config multiple times with small delay
     models_created = []
     for i in range(3):
+        # Small delay to ensure different timestamps
+        if i > 0:
+            time.sleep(1)  # 1 second delay to ensure different timestamps
+
         temp_model = tempfile.NamedTemporaryFile(suffix=".joblib", delete=False)
         temp_model.write(f"model {i}".encode())
         temp_model.close()
@@ -159,9 +163,6 @@ def test_registry_get_latest_by_config(temp_models_dir):
         registry.register_model(Path(temp_model.name), metadata)
         models_created.append(metadata)
         Path(temp_model.name).unlink(missing_ok=True)
-
-        # Small delay to ensure different timestamps
-        time.sleep(0.1)
 
     # Get latest
     config_hash = models_created[0].get_config_hash()
