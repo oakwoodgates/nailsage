@@ -1,6 +1,7 @@
 """Utility functions for model metadata generation and management."""
 
 import hashlib
+import secrets
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -9,39 +10,101 @@ from typing import Any, Optional
 from models.metadata import ModelMetadata
 
 
-def generate_model_id(
+def generate_config_hash(
     strategy_name: str,
     training_dataset_path: str,
     training_date_range: tuple[str, str],
     model_config: dict,
-    use_hash: bool = True,
+    feature_config: Optional[dict] = None,
+    target_config: Optional[dict] = None,
 ) -> str:
     """
-    Generate a unique model ID.
+    Generate deterministic hash from model configuration (intent).
+
+    This hash represents WHAT you want to train, independent of WHEN/HOW.
+    Used for deduplication and finding similar models.
 
     Args:
         strategy_name: Name of the strategy
         training_dataset_path: Path to training dataset
         training_date_range: Training date range
         model_config: Model hyperparameters
-        use_hash: If True, use hash-based ID; if False, use UUID
+        feature_config: Optional feature configuration
+        target_config: Optional target configuration
+
+    Returns:
+        16-character hexadecimal hash
+    """
+    components = [
+        strategy_name,
+        training_dataset_path,
+        training_date_range[0],
+        training_date_range[1],
+        str(sorted(model_config.items())),
+    ]
+
+    # Include feature and target configs if provided
+    if feature_config:
+        components.append(str(sorted(feature_config.items())))
+    if target_config:
+        components.append(str(sorted(target_config.items())))
+
+    hash_input = "|".join(components).encode("utf-8")
+    return hashlib.sha256(hash_input).hexdigest()[:16]
+
+
+def generate_model_id(
+    strategy_name: str,
+    training_dataset_path: str,
+    training_date_range: tuple[str, str],
+    model_config: dict,
+    feature_config: Optional[dict] = None,
+    target_config: Optional[dict] = None,
+    use_hybrid: bool = True,
+) -> str:
+    """
+    Generate a unique model ID.
+
+    Default (hybrid): {config_hash}_{timestamp}_{random_suffix}
+    Example: "2e30bea4e8f93845_20251108_153045_a3f9c2"
+
+    This format encodes:
+    - Config hash (16 chars): What you're training (intent)
+    - Timestamp (15 chars): When you trained it (implementation)
+    - Random suffix (6 chars): Collision prevention
+
+    Args:
+        strategy_name: Name of the strategy
+        training_dataset_path: Path to training dataset
+        training_date_range: Training date range
+        model_config: Model hyperparameters
+        feature_config: Optional feature configuration
+        target_config: Optional target configuration
+        use_hybrid: If True, use hybrid ID; if False, use UUID
 
     Returns:
         Unique model identifier
     """
-    if use_hash:
-        # Create deterministic hash based on key components
-        components = [
-            strategy_name,
-            training_dataset_path,
-            training_date_range[0],
-            training_date_range[1],
-            str(sorted(model_config.items())),
-        ]
-        hash_input = "|".join(components).encode("utf-8")
-        return hashlib.sha256(hash_input).hexdigest()[:16]
+    if use_hybrid:
+        # Generate config hash (intent)
+        config_hash = generate_config_hash(
+            strategy_name=strategy_name,
+            training_dataset_path=training_dataset_path,
+            training_date_range=training_date_range,
+            model_config=model_config,
+            feature_config=feature_config,
+            target_config=target_config,
+        )
+
+        # Generate timestamp (implementation)
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+        # Add random suffix for collision prevention (same-second training)
+        random_suffix = secrets.token_hex(3)  # 6 characters
+
+        return f"{config_hash}_{timestamp}_{random_suffix}"
     else:
-        # Use random UUID
+        # Fallback to UUID (for migration or special cases)
         return str(uuid.uuid4())
 
 
@@ -91,7 +154,9 @@ def create_model_metadata(
             training_dataset_path=training_dataset_path,
             training_date_range=training_date_range,
             model_config=model_config,
-            use_hash=True,
+            feature_config=feature_config,
+            target_config=target_config,
+            use_hybrid=True,  # Use hybrid IDs by default
         )
 
     return ModelMetadata(

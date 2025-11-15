@@ -125,6 +125,47 @@ class ModelMetadata:
 
         return cls.from_dict(data)
 
+    def get_config_hash(self) -> Optional[str]:
+        """
+        Extract config hash from hybrid model ID.
+
+        For hybrid IDs (format: {config_hash}_{timestamp}_{suffix}),
+        returns the config hash portion. For non-hybrid IDs, returns None.
+
+        Returns:
+            Config hash if hybrid ID, None otherwise
+        """
+        parts = self.model_id.split("_")
+        if len(parts) >= 3 and len(parts[0]) == 16:
+            # Hybrid ID: first part is config hash (16 hex chars)
+            return parts[0]
+        return None
+
+    def get_training_timestamp(self) -> Optional[str]:
+        """
+        Extract training timestamp from hybrid model ID.
+
+        For hybrid IDs (format: {config_hash}_{timestamp}_{suffix}),
+        returns the timestamp portion. For non-hybrid IDs, returns None.
+
+        Returns:
+            Timestamp string (YYYYMMDD_HHMMSS) if hybrid ID, None otherwise
+        """
+        parts = self.model_id.split("_")
+        if len(parts) >= 3 and len(parts[0]) == 16:
+            # Hybrid ID: second and third parts form timestamp
+            return f"{parts[1]}_{parts[2]}"
+        return None
+
+    def is_hybrid_id(self) -> bool:
+        """
+        Check if model ID is hybrid format.
+
+        Returns:
+            True if hybrid ID format, False otherwise
+        """
+        return self.get_config_hash() is not None
+
     def get_dataset_metadata(self) -> Optional[DatasetMetadata]:
         """
         Load the associated dataset metadata.

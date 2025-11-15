@@ -352,3 +352,71 @@ class ModelRegistry:
             strategy["versions"] = sorted(list(strategy["versions"]))
 
         return summary
+
+    def find_models_by_config(self, config_hash: str) -> list[ModelMetadata]:
+        """
+        Find all models with a specific configuration hash.
+
+        This finds all training runs of the same configuration (intent),
+        regardless of when they were trained.
+
+        Args:
+            config_hash: Configuration hash to search for (16 hex chars)
+
+        Returns:
+            List of models with matching config hash, sorted chronologically
+        """
+        all_models = self.list_models()
+
+        # Filter by config hash
+        matching = [m for m in all_models if m.get_config_hash() == config_hash]
+
+        # Sort chronologically by model_id (timestamp is embedded)
+        matching.sort(key=lambda m: m.model_id)
+
+        logger.info(f"Found {len(matching)} models with config hash: {config_hash}")
+        return matching
+
+    def get_latest_by_config(self, config_hash: str) -> Optional[ModelMetadata]:
+        """
+        Get the most recently trained model for a specific configuration.
+
+        Args:
+            config_hash: Configuration hash to search for
+
+        Returns:
+            Most recent model with this config, or None if not found
+        """
+        models = self.find_models_by_config(config_hash)
+        if not models:
+            return None
+
+        # Last in chronologically sorted list
+        return models[-1]
+
+    def list_config_families(self) -> dict[str, list[ModelMetadata]]:
+        """
+        Group all models by their configuration hash.
+
+        Returns models organized into "families" - all training runs
+        of the same configuration grouped together.
+
+        Returns:
+            Dict mapping config_hash -> list of models with that hash
+        """
+        all_models = self.list_models()
+        families: dict[str, list[ModelMetadata]] = {}
+
+        for model in all_models:
+            config_hash = model.get_config_hash()
+            if config_hash:  # Hybrid IDs only
+                if config_hash not in families:
+                    families[config_hash] = []
+                families[config_hash].append(model)
+
+        # Sort each family chronologically
+        for models in families.values():
+            models.sort(key=lambda m: m.model_id)
+
+        logger.info(f"Found {len(families)} unique configurations")
+        return families
