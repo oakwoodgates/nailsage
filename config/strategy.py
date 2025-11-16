@@ -50,6 +50,10 @@ class TargetSection(BaseConfig):
     classes: Optional[int] = Field(default=None, description="Number of classes for classification")
     lookahead_bars: int = Field(default=1, description="Bars to look ahead", ge=1)
     threshold_pct: float = Field(default=0.5, description="Threshold percentage", gt=0.0)
+    class_weights: Optional[dict[int, float]] = Field(
+        default=None,
+        description="Class weights for imbalanced classification (e.g., {0: 5.0, 1: 1.0, 2: 5.0})"
+    )
 
 
 class ModelSection(BaseConfig):
