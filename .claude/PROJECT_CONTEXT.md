@@ -183,24 +183,42 @@ nailsage/                      # Project root
 
 ### ✅ Model Registry & Metadata
 - ModelMetadata: Complete provenance (strategy, data, features, hyperparameters, performance)
+- Hybrid ID system: {config_hash}_{timestamp}_{random_suffix} for tracking training runs
 - ModelRegistry: Centralized storage with flexible querying
-- Query models by: strategy, timeframe, version, metrics, asset, date ranges
+- Query models by: strategy, config hash, timeframe, version, metrics
+- Config-aware queries: find all runs of same configuration
 - Model comparison and lineage tracking
 - Links ModelMetadata → DatasetMetadata for full reproducibility
-- Utility functions for metadata generation and comparison
+- 21 unit tests passing
+
+### ✅ First Strategy Trained
+- **momentum_classifier v1**: XGBoost 3-class classifier for BTC/USDT perps
+- **Data**: 172k 1m bars resampled to 15m (Jul-Nov 2025)
+- **Features**: 9 technical indicators (EMA, RSI, MACD, ROC, BB, ATR, Volume MA)
+- **Performance**: 95.65% validation accuracy (but class imbalance issue)
+- **Model ID**: 28ddedac3886db54_20251115_015256_89beaa
+- **Config**: YAML-based (configs/strategies/momentum_classifier_v1.yaml)
+- **Training**: Automated pipeline (strategies/short_term/train_momentum_classifier.py)
+- **Registered**: Full metadata tracking with hybrid ID
+
+### ✅ Strategy Configuration System
+- Extended StrategyConfig with nested sections (DataSection, TargetSection, ModelSection, etc.)
+- YAML-based strategy definitions with 7 configuration sections
+- IndicatorConfig for flexible feature specification
+- Comprehensive strategy guide (docs/STRATEGY_GUIDE.md)
 
 ## Current Status
-**Phase**: Core Framework Complete + Metadata & Registry (17/25 milestones)
-**Lines of Code**: ~5,000+ (production-ready)
-**Next Milestone**: First strategy implementation
+**Phase**: First Strategy Trained ✨ (19/25 milestones, 76%)
+**Lines of Code**: ~5,500+ (production-ready)
+**Next Milestone**: Second strategy to prove modularity
 
-## Ready to Implement
-With the foundation complete, we can now:
-1. Load and validate data (✅ with metadata tracking)
-2. Compute features dynamically (✅ 8 indicators ready)
-3. Split data with no leakage (✅ TimeSeriesSplitter)
-4. Train ML models (✅ ready for XGBoost/LightGBM)
-5. Backtest with realistic costs (✅ BacktestEngine)
-6. Validate with walk-forward methodology (✅ WalkForwardValidator)
-7. Track complete provenance (✅ Dataset + Model metadata)
-8. Query and compare models (✅ ModelRegistry)
+## Working End-to-End
+The complete ML pipeline is operational:
+1. Load and validate data ✅ (with metadata tracking)
+2. Compute features dynamically ✅ (8 indicators, caching enabled)
+3. Split data with no leakage ✅ (TimeSeriesSplitter)
+4. Train ML models ✅ (XGBoost trained, registered, tracked)
+5. Track complete provenance ✅ (Dataset + Model metadata with hybrid IDs)
+6. Query and compare models ✅ (ModelRegistry with config-aware queries)
+7. Next up: Backtest simulation (BacktestEngine ready)
+8. Next up: Walk-forward validation (WalkForwardValidator ready)

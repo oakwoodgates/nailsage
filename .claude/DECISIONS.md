@@ -304,6 +304,46 @@
 ## Template for New Decisions
 
 ```markdown
+## ADR-013: No Backward Compatibility in Alpha Phase
+**Date**: 2025-11-15
+**Status**: Accepted
+
+**Context**: During alpha development, we need to decide whether to maintain backward compatibility when making architectural or configuration changes.
+
+**Decision**: **No backward compatibility is required during alpha phase** (pre-production). Breaking changes are acceptable without migration paths. However, **major rewrites must be explicitly flagged and approved** by the user.
+
+**Rationale**:
+- Faster iteration: Can clean up technical debt immediately (e.g., removing "old format" support)
+- Simpler codebase: No need to maintain dual code paths or compatibility shims
+- No production users: Nothing deployed yet, so no impact on existing systems
+- Faster learning: Can experiment with different approaches without legacy burden
+- Pre-deployment flexibility: Architecture can evolve based on what we learn
+
+**Consequences**:
+- **Positive**:
+  - Cleaner, more maintainable code
+  - Faster development velocity
+  - Can make bold architectural decisions
+  - Easier to refactor and improve
+- **Negative**:
+  - Need to update tests when schemas change
+  - Documentation must be kept current
+  - Saved configs/models may become incompatible
+- **Mitigation**:
+  - Always ask user before major rewrites (> ~500 LOC changes)
+  - Update documentation immediately when breaking changes occur
+  - Keep .claude/ files current with latest architecture
+  - Run all tests after breaking changes
+
+**When This Changes**:
+Once we deploy to production or have external users:
+1. Introduce semantic versioning
+2. Maintain backward compatibility within major versions
+3. Provide migration guides for major version upgrades
+4. Add deprecation warnings before removing features
+
+---
+
 ## ADR-XXX: [Title]
 **Date**: YYYY-MM-DD
 **Status**: [Proposed | Accepted | Deprecated | Superseded]

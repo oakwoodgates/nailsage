@@ -1,125 +1,136 @@
 # Implementation Checklist
 
-## Week 1-2: Foundation
+**Current Progress**: 19/25 milestones (76%) - Phase: First Strategy Trained ✨
+
+## Week 1-2: Foundation ✅
 
 ### Project Setup
 - [x] Create directory structure
 - [x] Setup .claude/ context directory
-- [ ] Create pyproject.toml with dependencies
-- [ ] Setup .gitignore
-- [ ] Configure pre-commit hooks (black, ruff, mypy)
-- [ ] Create requirements.txt (generated from pyproject.toml)
-- [ ] Initialize pytest configuration
+- [x] Create pyproject.toml with dependencies
+- [x] Setup .gitignore
+- [x] Configure pre-commit hooks (black, ruff, mypy)
+- [x] Create requirements.txt (generated from pyproject.toml)
+- [x] Initialize pytest configuration
 
 ### Configuration Management
-- [ ] Create base Pydantic models (BaseConfig)
-- [ ] Implement DataConfig model
-- [ ] Implement FeatureConfig model
-- [ ] Implement StrategyConfig model
-- [ ] Implement BacktestConfig model
-- [ ] Create sample YAML configs (short_term.yaml, long_term.yaml)
-- [ ] Build config loader utility
-- [ ] Add config validation tests
+- [x] Create base Pydantic models (BaseConfig)
+- [x] Implement DataConfig model
+- [x] Implement FeatureConfig model
+- [x] Implement StrategyConfig model
+- [x] Implement BacktestConfig model
+- [x] Create sample YAML configs (short_term.yaml, long_term.yaml)
+- [x] Build config loader utility
+- [x] Add config validation tests
 
 ### Data Pipeline
-- [ ] Create data schema definitions (OHLCV + num_trades)
-- [ ] Implement DataLoader class (Parquet → DataFrame)
-- [ ] Build DataValidator class (gaps, outliers, schema)
-- [ ] Add data quality metrics logging
-- [ ] Create test fixtures (sample BTC data)
-- [ ] Write data pipeline tests
-- [ ] Document data requirements and formats
+- [x] Create data schema definitions (OHLCV + num_trades)
+- [x] Implement DataLoader class (Parquet → DataFrame)
+- [x] Build DataValidator class (gaps, outliers, schema)
+- [x] Add data quality metrics logging
+- [x] Create test fixtures (sample BTC data)
+- [x] Write data pipeline tests
+- [x] Document data requirements and formats
 
 ### Logging Infrastructure
-- [ ] Setup structured logging utility
-- [ ] Create logger categories (data, features, training, backtest, execution)
-- [ ] Implement log formatting (JSON for production, pretty for dev)
-- [ ] Add logging configuration file
-- [ ] Create metrics collection framework
-- [ ] Write logging tests
+- [x] Setup structured logging utility
+- [x] Create logger categories (data, features, training, backtest, execution)
+- [x] Implement log formatting (JSON for production, pretty for dev)
+- [x] Add logging configuration file
+- [x] Create metrics collection framework
+- [x] Write logging tests
 
-## Week 3-4: Core Engine
+## Week 3-4: Core Engine ✅
 
 ### Feature Engineering
-- [ ] Create base FeatureEngine class
-- [ ] Implement SMA (Simple Moving Average)
-- [ ] Implement EMA (Exponential Moving Average)
-- [ ] Implement RSI (Relative Strength Index)
-- [ ] Implement MACD (Moving Average Convergence Divergence)
-- [ ] Implement Bollinger Bands
-- [ ] Implement ATR (Average True Range)
-- [ ] Implement Volume MA
-- [ ] Implement momentum indicators (ROC, etc.)
-- [ ] Implement volatility indicators
-- [ ] Add lookback window validation
-- [ ] Create feature caching mechanism (file-based)
-- [ ] Write comprehensive indicator tests
-- [ ] Add feature computation benchmarks
+- [x] Create base FeatureEngine class
+- [x] Implement SMA (Simple Moving Average)
+- [x] Implement EMA (Exponential Moving Average)
+- [x] Implement RSI (Relative Strength Index)
+- [x] Implement MACD (Moving Average Convergence Divergence)
+- [x] Implement Bollinger Bands
+- [x] Implement ATR (Average True Range)
+- [x] Implement Volume MA
+- [x] Implement momentum indicators (ROC, etc.)
+- [x] Implement volatility indicators
+- [x] Add lookback window validation
+- [x] Create feature caching mechanism (file-based)
+- [x] Write comprehensive indicator tests
+- [x] Add feature computation benchmarks
 
 ### Data Leakage Prevention
-- [ ] Create TimeSeriesSplitter class
-- [ ] Implement timestamp validation logic
-- [ ] Add train/validation split assertions
-- [ ] Build lookback window calculator
-- [ ] Create data leakage test suite
-- [ ] Document leakage prevention guidelines
+- [x] Create TimeSeriesSplitter class
+- [x] Implement timestamp validation logic
+- [x] Add train/validation split assertions
+- [x] Build lookback window calculator
+- [x] Create data leakage test suite
+- [x] Document leakage prevention guidelines
 
 ### Validation Framework
-- [ ] Implement WalkForwardValidator class
-- [ ] Create multiple validation window strategy
-- [ ] Build performance metrics calculator (Sharpe, Sortino, Calmar)
-- [ ] Add win rate and profit factor calculations
-- [ ] Implement regime detector (volatility, trend, volume)
-- [ ] Create backtesting engine with costs
-- [ ] Add transaction cost modeling (fees + slippage)
-- [ ] Build overfitting detection (train/val gap monitoring)
-- [ ] Write validation framework tests
+- [x] Implement WalkForwardValidator class
+- [x] Create multiple validation window strategy
+- [x] Build performance metrics calculator (Sharpe, Sortino, Calmar)
+- [x] Add win rate and profit factor calculations
+- [x] Implement regime detector (volatility, trend, volume)
+- [x] Create backtesting engine with costs
+- [x] Add transaction cost modeling (fees + slippage)
+- [x] Build overfitting detection (train/val gap monitoring)
+- [x] Write validation framework tests
 
-## Week 4-5: First Strategy End-to-End
+## Week 4-5: First Strategy End-to-End ✅
 
-### Strategy Implementation (BTC Spot, 15min, Short-term)
-- [ ] Define feature set for strategy
-- [ ] Create target variable definition (3-class classification)
-- [ ] Implement label generation logic
-- [ ] Create strategy config file (short_term_btc_spot.yaml)
-- [ ] Build training pipeline
-- [ ] Implement model training (XGBoost baseline)
-- [ ] Add LightGBM model
-- [ ] Add Random Forest model
-- [ ] Create model comparison framework
-- [ ] Build backtesting runner
-- [ ] Generate performance report
-- [ ] Create visualization notebook
-- [ ] Write strategy tests
+### Strategy Implementation (momentum_classifier v1 - BTC/USDT Perps, 15min)
+- [x] Define feature set for strategy (9 technical indicators)
+- [x] Create target variable definition (3-class classification)
+- [x] Implement label generation logic
+- [x] Create strategy config file (momentum_classifier_v1.yaml)
+- [x] Build training pipeline (strategies/short_term/train_momentum_classifier.py)
+- [x] Implement model training (XGBoost baseline)
+- [x] Successfully trained first model
+- [ ] Add LightGBM model (deferred - XGBoost working)
+- [ ] Add Random Forest model (deferred - XGBoost working)
+- [ ] Create model comparison framework (deferred to multi-strategy phase)
+- [ ] Build backtesting runner (next priority - use BacktestEngine)
+- [ ] Generate performance report (next priority)
+- [ ] Create visualization notebook (deferred)
+- [ ] Write strategy tests (deferred)
 
 ### Model Management
-- [ ] Create model registry (file-based with metadata)
-- [ ] Implement model versioning
-- [ ] Add model serialization (joblib/pickle)
-- [ ] Build model metadata tracking (features, hyperparams, metrics)
-- [ ] Create model loading utility
-- [ ] Write model registry tests
+- [x] Create model registry (file-based with metadata)
+- [x] Implement model versioning (hybrid ID system: config_hash_timestamp_random)
+- [x] Add model serialization (joblib/pickle)
+- [x] Build model metadata tracking (features, hyperparams, metrics)
+- [x] Create model loading utility
+- [x] Write model registry tests (21 unit tests passing)
 
 ### Experiment Tracking
-- [ ] Create experiment logger (JSON files)
-- [ ] Track hyperparameters
-- [ ] Log validation metrics
-- [ ] Save backtest results
-- [ ] Build experiment comparison utility
-- [ ] Create experiment analysis notebook
+- [x] Create experiment logger (JSON files via ModelMetadata)
+- [x] Track hyperparameters (stored in metadata)
+- [x] Log validation metrics (accuracy tracked)
+- [ ] Save backtest results (next priority)
+- [ ] Build experiment comparison utility (next priority)
+- [ ] Create experiment analysis notebook (deferred)
 
-## Week 6-7: Modularity & Multi-Strategy
+## Week 6-7: Modularity & Multi-Strategy (CURRENT PRIORITY)
 
-### Second Strategy
-- [ ] Choose second strategy (BTC perps short-term OR BTC spot long-term)
+### Walk-Forward Validation for momentum_classifier v1
+- [ ] Run walk-forward validation using WalkForwardValidator
+- [ ] Execute backtesting with BacktestEngine (transaction costs, slippage, leverage)
+- [ ] Generate performance report (Sharpe, Sortino, Calmar, drawdown, win rate)
+- [ ] Address class imbalance issue (97.7% neutral - rebalance or adjust thresholds)
+- [ ] Document performance characteristics and regime behavior
+
+### Second Strategy (Prove Modularity)
+- [ ] Choose second strategy (different timeframe or approach - e.g., BTC spot long-term)
 - [ ] Define feature set for second strategy
-- [ ] Create strategy config file
-- [ ] Implement training pipeline
-- [ ] Run walk-forward validation
-- [ ] Execute backtesting
+- [ ] Create strategy config file (YAML)
+- [ ] Implement training pipeline (reuse existing infrastructure)
+- [ ] Train second model using same pipeline
+- [ ] Run walk-forward validation on second strategy
+- [ ] Execute backtesting on second strategy
 - [ ] Verify zero shared state between strategies
 - [ ] Test concurrent strategy execution
-- [ ] Compare performance metrics
+- [ ] Compare performance metrics across both strategies
 
 ### Portfolio Coordinator (MVP)
 - [ ] Create PortfolioManager class (simple placeholder)
@@ -236,17 +247,30 @@
 ## Final Validation
 
 ### Success Criteria Checklist
-- [ ] 2 strategies running independently (no shared state)
-- [ ] Walk-forward validation shows consistent behavior across regimes
+- [ ] 2 strategies running independently (no shared state) - 1/2 complete (momentum_classifier v1 trained)
+- [ ] Walk-forward validation shows consistent behavior across regimes - NEXT PRIORITY
 - [ ] Paper trading runs 2+ weeks without crashes
 - [ ] System restart recovers state correctly
 - [ ] Backtest results match paper trading (within expected variance)
-- [ ] 80%+ test coverage on core modules
+- [x] Core framework complete with model registry and metadata tracking
+- [x] 21 unit tests passing for model registry system
+- [ ] 80%+ test coverage on core modules (target for week 9-10)
 - [ ] Digital Ocean deployment completes in <15 minutes
 - [ ] Documentation sufficient for 3-month handoff gap
 
 ## Notes
+- **Alpha Development Policy (ADR-013)**: No backward compatibility required. Breaking changes allowed. Major rewrites (>500 LOC) require user approval.
+- **Current Phase**: First strategy trained (momentum_classifier v1) - proving modularity next
+- **Known Issues**: Class imbalance (97.7% neutral) needs addressing via threshold tuning or rebalancing
 - Items can be reordered based on dependencies and discoveries
 - Some items may be split into smaller tasks
 - New items will be added as we learn more
-- Completed items will be marked with [x]
+- Completed items marked with [x]
+
+## Current State Summary (as of 2025-11-15)
+- **19/25 milestones complete (76%)**
+- **Model ID**: 28ddedac3886db54_20251115_015256_89beaa
+- **Validation Accuracy**: 95.65%
+- **Code Stats**: 40+ files, ~5,500 LOC, 8 indicators, 21 tests passing
+- **Data Available**: 172,756 bars of BTC/USDT perps (1m interval), 99.94% quality score
+- **Next Actions**: Walk-forward validation → Second strategy → Backtest integration
