@@ -1,6 +1,6 @@
 # Implementation Checklist
 
-**Current Progress**: 19/25 milestones (76%) - Phase: First Strategy Trained ✨
+**Current Progress**: 20/25 milestones (80%) - Phase: Modularity Proven ✨
 
 ## Week 1-2: Foundation ✅
 
@@ -120,17 +120,17 @@
 - [ ] Address class imbalance issue (97.7% neutral - rebalance or adjust thresholds)
 - [ ] Document performance characteristics and regime behavior
 
-### Second Strategy (Prove Modularity)
-- [ ] Choose second strategy (different timeframe or approach - e.g., BTC spot long-term)
-- [ ] Define feature set for second strategy
-- [ ] Create strategy config file (YAML)
-- [ ] Implement training pipeline (reuse existing infrastructure)
-- [ ] Train second model using same pipeline
+### Second Strategy (Prove Modularity) ✅
+- [x] Choose second strategy (SOL swing classifier - 4h timeframe, 2-day lookahead, 5% threshold)
+- [x] Define feature set for second strategy (same 9 indicators - proven reusability)
+- [x] Create strategy config file (sol_swing_classifier_v1.yaml)
+- [x] Implement training pipeline (ZERO code changes - complete reuse!)
+- [x] Train second model using same pipeline (model ID: 89a110800e554613_20251116_032035_92da73)
 - [ ] Run walk-forward validation on second strategy
 - [ ] Execute backtesting on second strategy
-- [ ] Verify zero shared state between strategies
-- [ ] Test concurrent strategy execution
-- [ ] Compare performance metrics across both strategies
+- [x] Verify zero shared state between strategies (different model IDs, separate metadata)
+- [ ] Test concurrent strategy execution (deferred - not critical for Phase 1)
+- [ ] Compare performance metrics across both strategies (pending backtest results)
 
 ### Portfolio Coordinator (MVP)
 - [ ] Create PortfolioManager class (simple placeholder)

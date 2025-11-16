@@ -1,8 +1,8 @@
 # NailSage - Current Status
 
-**Last Updated**: 2025-11-15
-**Phase**: First Strategy Trained ✨
-**Progress**: 19/25 milestones (76%)
+**Last Updated**: 2025-11-16
+**Phase**: Modularity Proven ✅
+**Progress**: 20/25 milestones (80%)
 
 ## ✅ Completed Milestones
 
@@ -70,7 +70,7 @@
    - Model registered with hybrid ID: 28ddedac3886db54_20251115_015256_89beaa
    - Complete metadata tracking and provenance
 
-11. **Strategy Configuration System** ✨ NEW
+11. **Strategy Configuration System**
    - Extended StrategyConfig with nested sections (DataSection, TargetSection, ModelSection, etc.)
    - YAML-based strategy configs (data, features, target, model, validation, backtest, risk)
    - IndicatorConfig for flexible feature specification
@@ -78,9 +78,18 @@
    - Feature caching for performance
    - Comprehensive strategy guide (docs/STRATEGY_GUIDE.md)
 
+12. **Second Strategy & Modularity Proof** ✨ NEW
+   - SOL swing classifier (4h candles, 2-day lookahead, 5% threshold)
+   - Same pipeline, ZERO code changes - complete reuse!
+   - Different asset, timeframe, prediction target - all work seamlessly
+   - Model trained: 89a110800e554613_20251116_032035_92da73
+   - Validation accuracy: 60.61% (reasonable for swing prediction)
+   - Target distribution: 62% neutral, 20% short, 18% long (better balance than BTC)
+   - Modularity proven: config-driven system works for any asset/timeframe
+
 ## 🔄 In Progress
 
-None - ready for second strategy to prove modularity!
+None - modularity proven, ready for walk-forward validation and portfolio coordination!
 
 ## 📋 Remaining Milestones
 
@@ -111,33 +120,44 @@ None - ready for second strategy to prove modularity!
 - **Modules**: 8 (config, data, features, validation, strategies, models, execution, utils)
 - **Indicators**: 8 (SMA, EMA, RSI, MACD, ROC, BollingerBands, ATR, VolumeMA)
 - **Config Models**: 6 + 7 nested sections
-- **Strategies**: 1 trained (momentum_classifier v1)
-- **Models Registered**: 1 (95.65% val accuracy)
+- **Strategies**: 2 trained (BTC momentum_classifier, SOL swing_classifier)
+- **Models Registered**: 4 (baseline, lookahead4, weighted, SOL)
+- **Assets Supported**: 2 (BTC/USDT perps, SOL/USDT perps)
+- **Timeframes Tested**: 2 (15min, 4h)
 - **Scripts**: 3 (metadata generation, import verification, training)
 - **Unit Tests**: 21 passing
 - **Test Coverage**: Core model registry and metadata systems covered
 
 ## 🎯 Next Actions
 
-**Immediate**: Prove System Modularity
-- Train second strategy (different approach or timeframe)
-- Implement walk-forward validation for momentum_classifier
-- Run backtest simulation with transaction costs
-- Compare performance metrics across strategies
+**Immediate**: ✅ Modularity Proven! Next priorities:
+1. **Walk-forward validation** for both strategies
+2. **Strategy iteration** - improve BTC class weights (reduce from 5x)
+3. **Portfolio coordination MVP** - manage multiple strategies
+4. **Paper trading setup** - test in simulated live environment
 
-**Current Model Performance**:
-- Strategy: momentum_classifier v1
-- Model ID: 28ddedac3886db54_20251115_015256_89beaa
-- Training accuracy: 98.35%
-- Validation accuracy: 95.65%
-- Note: High accuracy but poor precision on minority classes (Short/Long)
-- Target distribution: 97.7% neutral, 1.1% short, 1.1% long
-- Action needed: Adjust threshold or rebalance classes
+**Trained Models**:
+
+**BTC momentum_classifier (weighted)**:
+- Model ID: 770a859f5f186bf8_20251116_023031_05e5f5
+- Timeframe: 15min candles
+- Lookahead: 4 bars (1 hour)
+- Training accuracy: 81.79%, Validation: 81.87%
+- Status: Makes trades (264 total) but loses money (-67% return)
+- Issue: Too aggressive with 5x class weights
+- Next: Try 2x-3x weights, or probability thresholding
+
+**SOL swing_classifier**:
+- Model ID: 89a110800e554613_20251116_032035_92da73
+- Timeframe: 4h candles
+- Lookahead: 12 bars (2 days)
+- Training accuracy: 89.93%, Validation: 60.61%
+- Status: Good class balance (62% neutral), struggling with Long predictions
+- Next: Add class weights or more features for swing detection
 
 **Data Available** ✅:
-- 172,756 bars of BTC/USDT perps (1m interval)
-- Date range: July 11 - Nov 8, 2025 (~120 days)
-- Quality score: 99.94%
+- BTC/USDT perps: 525,271 bars (1m), 365 days, 99.98% quality
+- SOL/USDT perps: 2,190 bars (4h), 365 days
 - Format: Parquet with metadata
 
 ## 🔧 Technical Debt / Known Issues
