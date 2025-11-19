@@ -251,6 +251,12 @@ features/cache/*
 *.key
 *.pem
 
+# Paper Trading State (execution module)
+execution/state/*.db
+execution/state/*.db-*
+execution/state/*.sqlite
+execution/state/*.sqlite-*
+
 # Logs
 logs/
 *.log.*
