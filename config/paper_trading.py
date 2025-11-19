@@ -113,9 +113,14 @@ class PaperTradingConfig(BaseSettings):
     This class uses pydantic-settings to automatically load values from
     environment variables or .env file.
 
+    Supports dev/prod modes via MODE environment variable.
+
     Attributes:
-        ws_url: WebSocket URL for Kirby API
-        ws_api_key: API key for authentication
+        mode: Environment mode ('dev' or 'prod')
+        ws_url_dev: WebSocket URL for dev environment
+        ws_url_prod: WebSocket URL for prod environment
+        api_key_dev: API key for dev environment
+        api_key_prod: API key for prod environment
         starlisting_btc_usdt_15m: BTC/USDT 15m starlisting ID
         starlisting_sol_usdt_4h: SOL/USDT 4h starlisting ID
         initial_capital: Starting capital for paper trading (USDT)
@@ -131,9 +136,16 @@ class PaperTradingConfig(BaseSettings):
         extra="ignore",
     )
 
-    # Kirby API settings
-    kirby_ws_url: str = Field(..., alias="KIRBY_WS_URL")
-    kirby_api_key: str = Field(..., alias="KIRBY_API_KEY")
+    # Environment mode
+    mode: str = Field(default="dev", alias="MODE")
+
+    # Kirby API settings (dev)
+    kirby_ws_url_dev: str = Field(..., alias="KIRBY_WS_URL_DEV")
+    kirby_api_key_dev: str = Field(..., alias="KIRBY_API_KEY_DEV")
+
+    # Kirby API settings (prod)
+    kirby_ws_url_pro: str = Field(..., alias="KIRBY_WS_URL_PRO")
+    kirby_api_key_pro: str = Field(..., alias="KIRBY_API_KEY_PRO")
 
     # Starlisting ID mappings
     starlisting_btc_usdt_15m: int = Field(..., alias="STARLISTING_BTC_USDT_15M")
@@ -158,8 +170,22 @@ class PaperTradingConfig(BaseSettings):
     )
 
     @property
+    def kirby_ws_url(self) -> str:
+        """Get WebSocket URL for current mode."""
+        if self.mode.lower() == "prod":
+            return self.kirby_ws_url_pro
+        return self.kirby_ws_url_dev
+
+    @property
+    def kirby_api_key(self) -> str:
+        """Get API key for current mode."""
+        if self.mode.lower() == "prod":
+            return self.kirby_api_key_pro
+        return self.kirby_api_key_dev
+
+    @property
     def websocket(self) -> WebSocketConfig:
-        """Get WebSocket configuration."""
+        """Get WebSocket configuration for current mode."""
         return WebSocketConfig(
             url=self.kirby_ws_url,
             api_key=self.kirby_api_key,
@@ -182,6 +208,14 @@ class PaperTradingConfig(BaseSettings):
     def log_level_obj(self) -> int:
         """Get logging level as integer constant."""
         return getattr(logging, self.paper_trading_log_level.upper())
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """Validate mode is either 'dev' or 'prod'."""
+        if v.lower() not in ["dev", "prod"]:
+            raise ValueError("Mode must be 'dev' or 'prod'")
+        return v.lower()
 
     @field_validator("paper_trading_initial_capital")
     @classmethod
