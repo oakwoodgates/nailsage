@@ -211,6 +211,29 @@ class KirbyWebSocketClient:
             self._running = False
             return
 
+        # Cancel existing tasks before reconnecting
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._receive_task and not self._receive_task.done():
+            self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
+
+        # Close existing connection
+        if self._ws:
+            try:
+                await self._ws.close()
+            except:
+                pass
+            self._ws = None
+
         # Calculate delay with exponential backoff
         delay = min(
             self.config.reconnect_initial_delay
