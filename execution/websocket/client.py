@@ -45,9 +45,8 @@ from execution.websocket.models import (
     OpenInterestUpdate,
     ServerMessage,
     SubscribeRequest,
-    SubscriptionConfirmed,
+    SuccessMessage,
     UnsubscribeRequest,
-    UnsubscriptionConfirmed,
 )
 
 logger = logging.getLogger(__name__)
@@ -253,7 +252,7 @@ class KirbyWebSocketClient:
             historical_candles = self.config.historical_candles
 
         request = SubscribeRequest(
-            starlisting_id=starlisting_id, historical_candles=historical_candles
+            starlisting_ids=[starlisting_id], historical_candles=historical_candles
         )
 
         logger.info(
@@ -277,7 +276,7 @@ class KirbyWebSocketClient:
         if not self._ws:
             raise ConnectionError("Not connected to WebSocket")
 
-        request = UnsubscribeRequest(starlisting_id=starlisting_id)
+        request = UnsubscribeRequest(starlisting_ids=[starlisting_id])
 
         logger.info(f"Unsubscribing from starlisting {starlisting_id}")
 
@@ -341,15 +340,15 @@ class KirbyWebSocketClient:
             message_type = data.get("type")
 
             # Dispatch to appropriate handler
-            if message_type == MessageType.CANDLE_UPDATE:
+            if message_type == MessageType.CANDLE:
                 msg = CandleUpdate(**data)
                 await self._handle_candle_update(msg)
 
-            elif message_type == MessageType.FUNDING_RATE_UPDATE:
+            elif message_type == MessageType.FUNDING:
                 msg = FundingRateUpdate(**data)
                 await self._handle_funding_rate_update(msg)
 
-            elif message_type == MessageType.OPEN_INTEREST_UPDATE:
+            elif message_type == MessageType.OPEN_INTEREST:
                 msg = OpenInterestUpdate(**data)
                 await self._handle_open_interest_update(msg)
 
@@ -357,13 +356,9 @@ class KirbyWebSocketClient:
                 msg = Heartbeat(**data)
                 await self._handle_heartbeat(msg)
 
-            elif message_type == MessageType.SUBSCRIPTION_CONFIRMED:
-                msg = SubscriptionConfirmed(**data)
-                logger.info(f"Subscription confirmed: {msg.message}")
-
-            elif message_type == MessageType.UNSUBSCRIPTION_CONFIRMED:
-                msg = UnsubscriptionConfirmed(**data)
-                logger.info(f"Unsubscription confirmed: {msg.message}")
+            elif message_type == MessageType.SUCCESS:
+                msg = SuccessMessage(**data)
+                logger.info(f"Success: {msg.message}")
 
             elif message_type == MessageType.ERROR:
                 msg = ErrorMessage(**data)
@@ -374,7 +369,7 @@ class KirbyWebSocketClient:
 
         except ValidationError as e:
             logger.error(f"Failed to parse message: {e}")
-            logger.debug(f"Raw message: {raw_message}")
+            logger.error(f"Raw message: {raw_message}")
 
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
@@ -383,7 +378,7 @@ class KirbyWebSocketClient:
         """Handle candle update message."""
         for callback in self._candle_callbacks:
             try:
-                result = callback(msg.candle)
+                result = callback(msg)  # Pass full CandleUpdate message, not just candle
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as e:
@@ -416,13 +411,16 @@ class KirbyWebSocketClient:
 
     async def _handle_error(self, msg: ErrorMessage) -> None:
         """Handle error message."""
-        logger.error(f"Server error: {msg.error}")
+        error_msg = msg.error_message
+        logger.error(f"Server error: {error_msg}")
+        if msg.code:
+            logger.error(f"Error code: {msg.code}")
         if msg.details:
             logger.error(f"Error details: {msg.details}")
 
         for callback in self._error_callbacks:
             try:
-                result = callback(msg.error, msg.details)
+                result = callback(error_msg, msg.details or msg.code)
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as e:
@@ -513,7 +511,19 @@ class KirbyWebSocketClient:
     @property
     def is_connected(self) -> bool:
         """Check if client is connected to WebSocket."""
-        return self._ws is not None and self._ws.open
+        if self._ws is None:
+            return False
+        try:
+            # Try to check connection state - different websockets versions have different APIs
+            if hasattr(self._ws, 'closed'):
+                return not self._ws.closed
+            elif hasattr(self._ws, 'open'):
+                return self._ws.open
+            else:
+                # Assume connected if we have a connection object
+                return True
+        except:
+            return False
 
     async def wait_until_closed(self) -> None:
         """Wait until the client is closed (useful for keeping the event loop alive)."""

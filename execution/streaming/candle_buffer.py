@@ -70,28 +70,13 @@ class CandleBuffer:
 
         Args:
             candle: Candle to add
-
-        Raises:
-            ValueError: If candle doesn't match buffer's starlisting_id/interval
         """
-        # Validate candle matches buffer configuration
-        if candle.starlisting_id != self.starlisting_id:
-            raise ValueError(
-                f"Candle starlisting_id {candle.starlisting_id} does not match "
-                f"buffer starlisting_id {self.starlisting_id}"
-            )
-        if candle.interval != self.interval:
-            raise ValueError(
-                f"Candle interval {candle.interval} does not match "
-                f"buffer interval {self.interval}"
-            )
-
         with self._lock:
             # Check for duplicate timestamps
             if len(self._buffer) > 0 and candle.timestamp == self._buffer[-1].timestamp:
                 # Update existing candle (in case of price updates on same timestamp)
                 logger.debug(
-                    f"Updating candle at timestamp {candle.datetime.isoformat()} "
+                    f"Updating candle at {candle.time} "
                     f"(close: {self._buffer[-1].close:.2f} → {candle.close:.2f})"
                 )
                 self._buffer[-1] = candle
@@ -99,7 +84,7 @@ class CandleBuffer:
                 # Add new candle
                 self._buffer.append(candle)
                 logger.debug(
-                    f"Added candle: {candle.datetime.isoformat()} "
+                    f"Added candle: {candle.time} "
                     f"(buffer: {len(self._buffer)}/{self.maxlen})"
                 )
 
@@ -333,14 +318,16 @@ class MultiCandleBuffer:
         with self._lock:
             return self._buffers.get(starlisting_id)
 
-    def add_candle(self, candle: Candle) -> None:
+    def add_candle(self, candle: Candle, starlisting_id: int, interval: str) -> None:
         """
         Add a candle to the appropriate buffer (auto-creates buffer if needed).
 
         Args:
             candle: Candle to add
+            starlisting_id: Kirby starlisting ID
+            interval: Timeframe (e.g., "15m", "4h")
         """
-        buffer = self.get_or_create(candle.starlisting_id, candle.interval)
+        buffer = self.get_or_create(starlisting_id, interval)
         buffer.add(candle)
 
     def __len__(self) -> int:
