@@ -211,11 +211,16 @@ class ModelPredictor:
         if len(feature_df) == 0:
             raise ValueError("No features computed - check candle data")
 
-        # Get feature names from metadata
-        feature_names = self.feature_engine.get_feature_names()
+        # Get all columns except timestamp (model expects OHLCV + computed features)
+        # The model was trained on: open, high, low, close, volume + all indicators
+        exclude_cols = ['timestamp']
+        feature_cols = [col for col in feature_df.columns if col not in exclude_cols]
+
+        if not feature_cols:
+            raise ValueError("No feature columns computed - check feature engine")
 
         # Extract features for prediction (last row only)
-        latest_features = feature_df.iloc[-1:][feature_names]
+        latest_features = feature_df.iloc[-1:][feature_cols]
 
         # Check for NaN values
         if latest_features.isna().any().any():
