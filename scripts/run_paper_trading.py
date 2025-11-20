@@ -101,12 +101,12 @@ class PaperTradingEngine:
 
         logger.info("\n[6/6] Subscribing to starlistings...")
         # Subscribe to BTC/USDT 15m (starlisting 2 - provides historical candles + live updates)
-        # Testing with 100 candles to verify historical data handling
+        # Production: Request 500 candles for full feature window (125 hours = ~5.2 days)
         await self.ws_client.subscribe(
             starlisting_id=self.config.starlisting_btc_usdt_15m,
-            history=100,
+            history=500,
         )
-        logger.info(f"  ✓ Subscribed to starlisting {self.config.starlisting_btc_usdt_15m} (BTC/USDT 15m with 100 historical candles)")
+        logger.info(f"  ✓ Subscribed to starlisting {self.config.starlisting_btc_usdt_15m} (BTC/USDT 15m with 500 historical candles)")
 
         # TODO: Subscribe to SOL/USDT 4h when we have that strategy
         # await self.ws_client.subscribe(
