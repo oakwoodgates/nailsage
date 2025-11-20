@@ -100,12 +100,13 @@ class PaperTradingEngine:
         logger.info("  ✓ Connected to Kirby")
 
         logger.info("\n[6/6] Subscribing to starlistings...")
-        # Subscribe to BTC/USDT 15m (starlisting 1)
+        # Subscribe to BTC/USDT 15m (starlisting 2 - provides historical candles + live updates)
+        # Testing with 100 candles to verify historical data handling
         await self.ws_client.subscribe(
             starlisting_id=self.config.starlisting_btc_usdt_15m,
-            historical_candles=500,
+            history=100,
         )
-        logger.info(f"  ✓ Subscribed to starlisting {self.config.starlisting_btc_usdt_15m}")
+        logger.info(f"  ✓ Subscribed to starlisting {self.config.starlisting_btc_usdt_15m} (BTC/USDT 15m with 100 historical candles)")
 
         # TODO: Subscribe to SOL/USDT 4h when we have that strategy
         # await self.ws_client.subscribe(

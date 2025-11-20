@@ -129,6 +129,7 @@ class LiveStrategy:
         self._candles_processed = 0
         self._signals_generated = 0
         self._trades_executed = 0
+        self._last_candle_timestamp: Optional[int] = None  # For candle-close detection
 
         logger.info(
             f"Initialized LiveStrategy: {config.strategy_name}",
@@ -182,6 +183,32 @@ class LiveStrategy:
         candle = candle_update.candle
         timestamp = candle.timestamp
         price = candle.close
+
+        # ===================================================================
+        # CANDLE CLOSE DETECTION
+        # 15m candles update every second, but we only want to trade when
+        # a candle CLOSES (i.e., when a NEW candle starts with different timestamp)
+        # ===================================================================
+
+        # Check if this is the same candle (still forming)
+        if self._last_candle_timestamp == timestamp:
+            # Same candle - just update position P&L and return
+            logger.debug(f"Candle still forming (timestamp {timestamp}), updating P&L only")
+            await self._update_positions_pnl(price)
+            return
+
+        # Different timestamp - a NEW candle started, meaning previous one CLOSED
+        if self._last_candle_timestamp is not None:
+            logger.info(
+                f"🕯️  Candle closed! Previous: {self._last_candle_timestamp}, New: {timestamp}. Running inference..."
+            )
+
+        # Update for next iteration
+        self._last_candle_timestamp = timestamp
+
+        # ===================================================================
+        # INFERENCE & TRADING (only on candle close)
+        # ===================================================================
 
         logger.debug(
             f"Processing candle for {self.config.strategy_name}",

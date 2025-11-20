@@ -31,6 +31,11 @@ class MessageType(str, Enum):
     ERROR = "error"
     SUCCESS = "success"  # Subscription confirmation
 
+    # Historical data types (sent on initial subscription)
+    HISTORICAL = "historical"
+    HISTORICAL_FUNDING = "historical_funding"
+    HISTORICAL_OI = "historical_oi"
+
 
 # ============================================================================
 # Core Data Models
@@ -165,26 +170,26 @@ class SubscribeRequest(BaseModel):
         {
             "action": "subscribe",
             "starlisting_ids": [1, 2],
-            "historical_candles": 200
+            "history": 200
         }
     """
 
     action: Literal[MessageType.SUBSCRIBE] = MessageType.SUBSCRIBE
     starlisting_ids: List[int] = Field(..., description="List of starlisting IDs to subscribe to")
-    historical_candles: Optional[int] = Field(
+    history: Optional[int] = Field(
         default=None,
         description="Number of historical candles to request (max 1000)"
     )
 
-    @field_validator("historical_candles")
+    @field_validator("history")
     @classmethod
-    def validate_historical_candles(cls, v: Optional[int]) -> Optional[int]:
-        """Validate historical candles is within allowed range."""
+    def validate_history(cls, v: Optional[int]) -> Optional[int]:
+        """Validate history is within allowed range."""
         if v is not None:
             if v < 0:
-                raise ValueError("historical_candles must be non-negative")
+                raise ValueError("history must be non-negative")
             if v > 1000:
-                raise ValueError("historical_candles cannot exceed 1000")
+                raise ValueError("history cannot exceed 1000")
         return v
 
 
@@ -364,6 +369,130 @@ class ErrorMessage(BaseModel):
         return self.message or self.error or "Unknown error"
 
 
+class HistoricalCandleUpdate(BaseModel):
+    """
+    Server message with historical candle data.
+
+    Historical messages contain MULTIPLE candles in an array.
+    Sent during initial subscription before live "candle" updates begin.
+
+    Example:
+        {
+            "type": "historical",
+            "starlisting_id": 2,
+            "exchange": "hyperliquid",
+            "coin": "BTC",
+            "quote": "USD",
+            "trading_pair": "BTC/USD",
+            "market_type": "perps",
+            "interval": "15m",
+            "count": 10,
+            "data": [
+                {
+                    "time": "2025-11-19T16:00:00+00:00",
+                    "open": "89500.000000000000000000",
+                    "high": "89800.000000000000000000",
+                    "low": "89400.000000000000000000",
+                    "close": "89700.000000000000000000",
+                    "volume": "123.456789000000000000",
+                    "num_trades": 1234
+                },
+                ...
+            ]
+        }
+    """
+
+    type: Literal[MessageType.HISTORICAL] = MessageType.HISTORICAL
+    starlisting_id: int = Field(..., description="Starlisting ID")
+    exchange: str = Field(..., description="Exchange name")
+    coin: str = Field(..., description="Base coin")
+    quote: str = Field(..., description="Quote currency")
+    trading_pair: str = Field(..., description="Trading pair")
+    market_type: str = Field(..., description="Market type (spot/perps)")
+    interval: str = Field(..., description="Timeframe")
+    count: int = Field(..., description="Number of historical candles")
+    data: List[Candle] = Field(..., description="Array of historical candles")
+
+    @property
+    def candles(self) -> List[Candle]:
+        """Get list of candles."""
+        return self.data
+
+
+class HistoricalFundingUpdate(BaseModel):
+    """
+    Server message with historical funding rate data.
+
+    Historical messages contain MULTIPLE funding rates in an array.
+
+    Example:
+        {
+            "type": "historical_funding",
+            "starlisting_id": 2,
+            "exchange": "hyperliquid",
+            "coin": "BTC",
+            "quote": "USD",
+            "trading_pair": "BTC/USD",
+            "market_type": "perps",
+            "count": 10,
+            "data": [
+                {
+                    "time": "2025-11-20T08:00:00Z",
+                    "funding_rate": "0.000100000000000000"
+                },
+                ...
+            ]
+        }
+    """
+
+    type: Literal[MessageType.HISTORICAL_FUNDING] = MessageType.HISTORICAL_FUNDING
+    starlisting_id: int = Field(..., description="Starlisting ID")
+    exchange: str = Field(..., description="Exchange name")
+    coin: str = Field(..., description="Base coin")
+    quote: str = Field(..., description="Quote currency")
+    trading_pair: str = Field(..., description="Trading pair")
+    market_type: str = Field(..., description="Market type (spot/perps)")
+    count: int = Field(..., description="Number of historical funding rates")
+    data: List[dict] = Field(..., description="Array of historical funding rates")
+
+
+class HistoricalOIUpdate(BaseModel):
+    """
+    Server message with historical open interest data.
+
+    Historical messages contain MULTIPLE open interest data points in an array.
+
+    Example:
+        {
+            "type": "historical_oi",
+            "starlisting_id": 2,
+            "exchange": "hyperliquid",
+            "coin": "BTC",
+            "quote": "USD",
+            "trading_pair": "BTC/USD",
+            "market_type": "perps",
+            "count": 10,
+            "data": [
+                {
+                    "time": "2025-11-20T08:00:00Z",
+                    "open_interest": "1234567.890123456789012345"
+                },
+                ...
+            ]
+        }
+    """
+
+    type: Literal[MessageType.HISTORICAL_OI] = MessageType.HISTORICAL_OI
+    starlisting_id: int = Field(..., description="Starlisting ID")
+    exchange: str = Field(..., description="Exchange name")
+    coin: str = Field(..., description="Base coin")
+    quote: str = Field(..., description="Quote currency")
+    trading_pair: str = Field(..., description="Trading pair")
+    market_type: str = Field(..., description="Market type (spot/perps)")
+    count: int = Field(..., description="Number of historical OI data points")
+    data: List[dict] = Field(..., description="Array of historical open interest")
+
+
 # ============================================================================
 # Union Types for Message Parsing
 # ============================================================================
@@ -374,6 +503,9 @@ ServerMessage = Union[
     CandleUpdate,
     FundingRateUpdate,
     OpenInterestUpdate,
+    HistoricalCandleUpdate,
+    HistoricalFundingUpdate,
+    HistoricalOIUpdate,
     Heartbeat,
     SuccessMessage,
     ErrorMessage,

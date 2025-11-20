@@ -40,6 +40,9 @@ from execution.websocket.models import (
     FundingRate,
     FundingRateUpdate,
     Heartbeat,
+    HistoricalCandleUpdate,
+    HistoricalFundingUpdate,
+    HistoricalOIUpdate,
     MessageType,
     OpenInterest,
     OpenInterestUpdate,
@@ -142,7 +145,7 @@ class KirbyWebSocketClient:
             if self._subscribed_starlistings:
                 logger.info(f"Resubscribing to {len(self._subscribed_starlistings)} starlistings")
                 for starlisting_id in list(self._subscribed_starlistings):
-                    await self.subscribe(starlisting_id, historical_candles=0)
+                    await self.subscribe(starlisting_id, history=0)
 
         except Exception as e:
             logger.error(f"Failed to connect to Kirby WebSocket: {e}")
@@ -255,14 +258,14 @@ class KirbyWebSocketClient:
     # ========================================================================
 
     async def subscribe(
-        self, starlisting_id: int, historical_candles: Optional[int] = None
+        self, starlisting_id: int, history: Optional[int] = None
     ) -> None:
         """
         Subscribe to a starlisting for real-time updates.
 
         Args:
             starlisting_id: Kirby starlisting ID to subscribe to
-            historical_candles: Number of historical candles to request (max 1000)
+            history: Number of historical candles to request (max 1000)
 
         Raises:
             ConnectionError: If not connected to WebSocket
@@ -271,16 +274,16 @@ class KirbyWebSocketClient:
             raise ConnectionError("Not connected to WebSocket")
 
         # Use configured default if not specified
-        if historical_candles is None:
-            historical_candles = self.config.historical_candles
+        if history is None:
+            history = self.config.historical_candles
 
         request = SubscribeRequest(
-            starlisting_ids=[starlisting_id], historical_candles=historical_candles
+            starlisting_ids=[starlisting_id], history=history
         )
 
         logger.info(
             f"Subscribing to starlisting {starlisting_id} "
-            f"(requesting {historical_candles} historical candles)"
+            f"(requesting {history} historical candles)"
         )
 
         await self._send_message(request)
@@ -367,13 +370,25 @@ class KirbyWebSocketClient:
                 msg = CandleUpdate(**data)
                 await self._handle_candle_update(msg)
 
+            elif message_type == MessageType.HISTORICAL:
+                msg = HistoricalCandleUpdate(**data)
+                await self._handle_historical_candle(msg)
+
             elif message_type == MessageType.FUNDING:
                 msg = FundingRateUpdate(**data)
                 await self._handle_funding_rate_update(msg)
 
+            elif message_type == MessageType.HISTORICAL_FUNDING:
+                msg = HistoricalFundingUpdate(**data)
+                await self._handle_historical_funding(msg)
+
             elif message_type == MessageType.OPEN_INTEREST:
                 msg = OpenInterestUpdate(**data)
                 await self._handle_open_interest_update(msg)
+
+            elif message_type == MessageType.HISTORICAL_OI:
+                msg = HistoricalOIUpdate(**data)
+                await self._handle_historical_oi(msg)
 
             elif message_type == MessageType.HEARTBEAT:
                 msg = Heartbeat(**data)
@@ -407,6 +422,32 @@ class KirbyWebSocketClient:
             except Exception as e:
                 logger.error(f"Error in candle callback: {e}", exc_info=True)
 
+    async def _handle_historical_candle(self, msg: HistoricalCandleUpdate) -> None:
+        """
+        Handle historical candle message.
+
+        Historical candles arrive as an array. We iterate through each candle
+        and pass it to the candle callbacks as if it were a live candle update.
+        This ensures the buffer gets populated with all historical data.
+        """
+        logger.info(f"Received {msg.count} historical candles for starlisting {msg.starlisting_id}")
+
+        # Iterate through each historical candle
+        for candle in msg.data:
+            # Convert to CandleUpdate for callback compatibility
+            candle_update = CandleUpdate(
+                type=MessageType.CANDLE,
+                starlisting_id=msg.starlisting_id,
+                exchange=msg.exchange,
+                coin=msg.coin,
+                quote=msg.quote,
+                trading_pair=msg.trading_pair,
+                market_type=msg.market_type,
+                interval=msg.interval,
+                data=candle,
+            )
+            await self._handle_candle_update(candle_update)
+
     async def _handle_funding_rate_update(self, msg: FundingRateUpdate) -> None:
         """Handle funding rate update message."""
         for callback in self._funding_rate_callbacks:
@@ -417,6 +458,15 @@ class KirbyWebSocketClient:
             except Exception as e:
                 logger.error(f"Error in funding rate callback: {e}", exc_info=True)
 
+    async def _handle_historical_funding(self, msg: HistoricalFundingUpdate) -> None:
+        """
+        Handle historical funding rate message.
+
+        Historical funding rates arrive as an array.
+        For now, we just log them. In the future, we can iterate and process each one.
+        """
+        logger.info(f"Received {msg.count} historical funding rates for starlisting {msg.starlisting_id}")
+
     async def _handle_open_interest_update(self, msg: OpenInterestUpdate) -> None:
         """Handle open interest update message."""
         for callback in self._open_interest_callbacks:
@@ -426,6 +476,15 @@ class KirbyWebSocketClient:
                     await result
             except Exception as e:
                 logger.error(f"Error in open interest callback: {e}", exc_info=True)
+
+    async def _handle_historical_oi(self, msg: HistoricalOIUpdate) -> None:
+        """
+        Handle historical open interest message.
+
+        Historical open interest data arrives as an array.
+        For now, we just log them. In the future, we can iterate and process each one.
+        """
+        logger.info(f"Received {msg.count} historical OI data points for starlisting {msg.starlisting_id}")
 
     async def _handle_heartbeat(self, msg: Heartbeat) -> None:
         """Handle heartbeat message."""
