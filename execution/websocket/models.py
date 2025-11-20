@@ -28,6 +28,7 @@ class MessageType(str, Enum):
     FUNDING = "funding"
     OPEN_INTEREST = "open_interest"
     HEARTBEAT = "heartbeat"
+    PING = "ping"  # Kirby's heartbeat/ping message
     ERROR = "error"
     SUCCESS = "success"  # Subscription confirmation
 

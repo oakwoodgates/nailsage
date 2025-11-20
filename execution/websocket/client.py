@@ -394,6 +394,11 @@ class KirbyWebSocketClient:
                 msg = Heartbeat(**data)
                 await self._handle_heartbeat(msg)
 
+            elif message_type == MessageType.PING:
+                # Kirby's ping/heartbeat - just update last heartbeat time
+                self._last_heartbeat = datetime.now()
+                logger.debug("Received ping (heartbeat)")
+
             elif message_type == MessageType.SUCCESS:
                 msg = SuccessMessage(**data)
                 logger.info(f"Success: {msg.message}")
