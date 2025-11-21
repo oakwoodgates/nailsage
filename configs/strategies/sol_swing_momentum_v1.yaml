@@ -89,6 +89,7 @@ backtest:
   slippage_bps: 3  # Slightly higher for SOL
   leverage: 2
   capital: 10000
+  min_bars_between_trades: 4  # 16 hours cooldown (4 x 4H bars)
 
 # Risk - wider stops for swing
 risk:
