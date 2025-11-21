@@ -1,0 +1,26 @@
+# Default Risk Management Configuration
+
+# Position sizing
+position_size_method: fixed_fractional
+position_size_pct: 0.1  # 10% of capital per position
+
+# Leverage
+max_leverage: 1.0  # No leverage for conservative start
+leverage_per_strategy: null
+
+# Risk limits
+max_positions: 5
+max_exposure: 1.0  # 100% of capital total
+max_correlation: 0.7
+
+# Stop loss / Take profit (disabled by default)
+use_stop_loss: false
+stop_loss_pct: 0.02  # 2%
+use_take_profit: false
+take_profit_pct: 0.05  # 5%
+
+# Risk per trade
+max_risk_per_trade_pct: 0.02  # 2% of capital
+
+# Portfolio-level
+max_drawdown_stop_pct: 0.20  # Stop at 20% drawdown
