@@ -136,6 +136,64 @@ Track progress toward MVP completion.
 
 ---
 
+## Phase 10: Model Quality Improvements
+
+### P0 - Critical (Data Integrity & Valid Results) ✅
+
+- [x] **Exclude OHLCV from features** - Prevent data leakage (predicting close from close)
+  - [x] Update `train_momentum_classifier.py` to drop OHLCV columns
+  - [x] Update `validate_momentum_classifier.py` to match
+  - [x] Verified: 18 features (was 24 with OHLCV)
+
+- [x] **Probability-based filtering** - Only trade on high-confidence predictions
+  - [x] Add `predict_proba()` support to validation script
+  - [x] Add `confidence_threshold` config option in TargetSection
+  - [x] Filter signals in validation based on threshold
+  - [x] Verified: 17.6% filtered at 50% threshold
+
+- [x] **True walk-forward validation** - Retrain model each split
+  - [x] Add `--retrain` flag to validation script
+  - [x] Train fresh model on each split's training data
+  - [x] Verified: "Training fresh random_forest model on split 1..."
+
+### P1 - High (Trading Improvements)
+
+- [ ] **Binary classification target** - Long/Short only (no neutral class)
+  - [ ] Create `create_binary_target()` in targets module
+  - [ ] Add `target.classes: 2` config support
+  - [ ] Update training to handle binary case
+
+- [ ] **Trade cooldown/debounce** - Minimum bars between trades
+  - [ ] Add `min_bars_between_trades` config option
+  - [ ] Implement cooldown in signal generator
+  - [ ] Track last trade time in backtest
+
+- [ ] **Position sizing by confidence** - Scale position with prediction probability
+  - [ ] Add `position_sizing_mode: confidence` config option
+  - [ ] Scale position size: base_size * (confidence - 0.5) * 2
+  - [ ] Update backtest engine to support variable sizing
+
+- [ ] **Hyperparameter optimization** - Automated tuning
+  - [ ] Add Optuna integration
+  - [ ] Define search space per model type
+  - [ ] Save best params to config
+
+### P2 - Medium (Advanced Features)
+
+- [ ] **Multi-timeframe features** - Higher TF context for short TF models
+- [ ] **Regime detection** - Trending vs ranging market classification
+- [ ] **Feature selection** - SHAP/permutation importance filtering
+- [ ] **Ensemble models** - Voting/stacking multiple models
+
+### P3 - Future (Research)
+
+- [ ] **Reinforcement learning** - Train on PnL not classification
+- [ ] **Online learning** - Incremental model updates
+- [ ] **Alternative targets** - Regression, ranking, custom losses
+- [ ] **Order book features** - Depth, imbalance (requires new data)
+
+---
+
 ## 🎉 MVP Complete! What's Next?
 
 The core NailSage paper trading MVP is **feature complete**! Here are potential next steps:
