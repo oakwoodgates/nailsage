@@ -85,6 +85,11 @@ class BacktestSection(BaseConfig):
     slippage_bps: int = Field(default=2, description="Slippage in basis points", ge=0)
     leverage: int = Field(default=1, description="Leverage", ge=1)
     capital: float = Field(default=10000, description="Starting capital", gt=0.0)
+    min_bars_between_trades: int = Field(
+        default=0,
+        description="Minimum bars between trades (cooldown). 0 = no cooldown.",
+        ge=0
+    )
 
 
 class RiskSection(BaseConfig):

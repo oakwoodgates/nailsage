@@ -16,7 +16,7 @@ from data.loader import DataLoader
 from data.validator import DataValidator
 from features.engine import FeatureEngine
 from models import ModelRegistry, create_model_metadata
-from targets.classification import create_3class_target
+from targets.classification import create_3class_target, create_binary_target
 from validation.time_series_split import TimeSeriesSplitter
 from utils.logger import get_logger, setup_logger
 
@@ -115,13 +115,22 @@ def train_strategy(config_path: str):
 
     logger.info(f"Generated {len(df_features.columns)} features")
 
-    # Create target variable
-    logger.info("Creating target variable...")
-    target = create_3class_target(
-        df_features,
-        lookahead_bars=config.target_lookahead_bars,
-        threshold_pct=config.target_threshold_pct
-    )
+    # Create target variable based on number of classes
+    num_classes = config.target.classes or 3
+    logger.info(f"Creating {num_classes}-class target variable...")
+
+    if num_classes == 2:
+        target = create_binary_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
+    else:
+        target = create_3class_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
 
     # Remove rows with NaN (from lookahead and feature computation)
     valid_idx = target.notna() & df_features.notna().all(axis=1)

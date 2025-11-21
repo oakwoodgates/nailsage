@@ -65,6 +65,7 @@ class BacktestEngine:
         df: pd.DataFrame,
         signals: pd.Series,
         price_column: str = "close",
+        confidences: pd.Series = None,
     ) -> PerformanceMetrics:
         """
         Run backtest on signals.
@@ -73,6 +74,7 @@ class BacktestEngine:
             df: DataFrame with OHLCV data
             signals: Series with signals (-1 = short, 0 = neutral, 1 = long)
             price_column: Column to use for execution prices
+            confidences: Optional series of confidence scores (0.0-1.0) for position sizing
 
         Returns:
             PerformanceMetrics object
@@ -141,8 +143,9 @@ class BacktestEngine:
                 entry_price = current_price
                 entry_time = current_time
 
-                # Calculate position size
-                position_size = self._calculate_position_size(capital, current_price)
+                # Calculate position size (optionally scaled by confidence)
+                current_confidence = confidences.iloc[i] if confidences is not None else None
+                position_size = self._calculate_position_size(capital, current_price, current_confidence)
 
             # Update equity
             if position != 0:
@@ -241,13 +244,16 @@ class BacktestEngine:
 
         return price
 
-    def _calculate_position_size(self, capital: float, price: float) -> float:
+    def _calculate_position_size(
+        self, capital: float, price: float, confidence: float = None
+    ) -> float:
         """
         Calculate position size based on capital and configuration.
 
         Args:
             capital: Available capital
             price: Current price
+            confidence: Optional confidence score (0.0-1.0) for scaling position
 
         Returns:
             Position size in base currency
@@ -258,6 +264,12 @@ class BacktestEngine:
         # Apply leverage if enabled
         if self.config.enable_leverage:
             max_position_value *= self.config.max_leverage
+
+        # Scale by confidence if provided (confidence 0.5 = 0%, confidence 1.0 = 100%)
+        if confidence is not None and confidence > 0.5:
+            # Scale: 0.5 -> 0%, 0.75 -> 50%, 1.0 -> 100%
+            confidence_scale = (confidence - 0.5) * 2
+            max_position_value *= confidence_scale
 
         # Convert to size in base currency
         size = max_position_value / price

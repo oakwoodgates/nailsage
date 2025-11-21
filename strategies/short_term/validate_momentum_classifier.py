@@ -23,7 +23,7 @@ from config.strategy import StrategyConfig
 from data.loader import DataLoader
 from features.engine import FeatureEngine
 from models import ModelRegistry
-from targets.classification import create_3class_target
+from targets.classification import create_3class_target, create_binary_target
 from validation.backtest import BacktestEngine
 from validation.time_series_split import TimeSeriesSplitter
 from validation.walk_forward import WalkForwardValidator
@@ -52,26 +52,64 @@ setup_logger(level=20)  # INFO
 logger = get_logger("validation")
 
 
+def apply_trade_cooldown(signals: np.ndarray, min_bars: int) -> np.ndarray:
+    """
+    Apply cooldown between trades - suppress signals within min_bars of last trade.
+
+    Args:
+        signals: Array of signals (-1, 0, 1)
+        min_bars: Minimum bars between trades (0 = no cooldown)
+
+    Returns:
+        Signals with cooldown applied
+    """
+    if min_bars <= 0:
+        return signals
+
+    result = signals.copy()
+    last_trade_idx = -min_bars - 1  # Initialize to allow first trade
+
+    for i in range(len(signals)):
+        if signals[i] != 0:  # Non-neutral signal
+            if i - last_trade_idx > min_bars:
+                # Enough bars have passed, allow trade
+                last_trade_idx = i
+            else:
+                # Still in cooldown, suppress signal
+                result[i] = 0
+
+    return result
+
+
 def convert_predictions_to_signals(
     predictions: np.ndarray,
     probabilities: np.ndarray = None,
-    confidence_threshold: float = 0.0
+    confidence_threshold: float = 0.0,
+    num_classes: int = 3
 ) -> np.ndarray:
     """
-    Convert 3-class predictions to trading signals with optional confidence filtering.
+    Convert predictions to trading signals with optional confidence filtering.
 
     Args:
-        predictions: Array of class predictions (0, 1, 2)
+        predictions: Array of class predictions (0, 1, 2 for 3-class; 0, 1 for binary)
         probabilities: Array of prediction probabilities (n_samples, n_classes)
         confidence_threshold: Minimum confidence to generate signal (0.0-1.0)
+        num_classes: Number of classes (2 or 3)
 
     Returns:
         Array of signals: -1 (short), 0 (neutral), 1 (long)
     """
     signals = np.zeros_like(predictions, dtype=int)
-    signals[predictions == 2] = 1   # Long
-    signals[predictions == 0] = -1  # Short
-    # predictions == 1 stays 0 (neutral)
+
+    if num_classes == 2:
+        # Binary: 0 = short, 1 = long
+        signals[predictions == 1] = 1   # Long
+        signals[predictions == 0] = -1  # Short
+    else:
+        # 3-class: 0 = short, 1 = neutral, 2 = long
+        signals[predictions == 2] = 1   # Long
+        signals[predictions == 0] = -1  # Short
+        # predictions == 1 stays 0 (neutral)
 
     # Filter by confidence if threshold is set
     if probabilities is not None and confidence_threshold > 0:
@@ -204,13 +242,22 @@ def validate_strategy(
 
     logger.info(f"Generated {len(df_features.columns)} total columns")
 
-    # Create target variable
-    logger.info("Creating target variable...")
-    target = create_3class_target(
-        df_features,
-        lookahead_bars=config.target_lookahead_bars,
-        threshold_pct=config.target_threshold_pct
-    )
+    # Create target variable based on number of classes
+    num_classes = config.target.classes or 3
+    logger.info(f"Creating {num_classes}-class target variable...")
+
+    if num_classes == 2:
+        target = create_binary_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
+    else:
+        target = create_3class_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
 
     # Remove rows with NaN
     valid_idx = target.notna() & df_features.notna().all(axis=1)
@@ -317,17 +364,30 @@ def validate_strategy(
         logger.info(f"  Val predictions: {val_metrics['pred_pct_short']:.1%} short, {val_metrics['pred_pct_neutral']:.1%} neutral, {val_metrics['pred_pct_long']:.1%} long")
 
         # Convert to signals with confidence filtering
-        val_signals = convert_predictions_to_signals(val_preds, val_probs, confidence_threshold)
+        val_signals = convert_predictions_to_signals(val_preds, val_probs, confidence_threshold, num_classes)
         if confidence_threshold > 0:
             filtered_pct = (val_signals == 0).sum() / len(val_signals)
             logger.info(f"  Confidence threshold: {confidence_threshold:.0%}, filtered to neutral: {filtered_pct:.1%}")
 
-        # Run backtest
+        # Apply trade cooldown if configured
+        min_bars_between = getattr(config.backtest, 'min_bars_between_trades', 0) if config.backtest else 0
+        if min_bars_between > 0:
+            signals_before = (val_signals != 0).sum()
+            val_signals = apply_trade_cooldown(val_signals, min_bars_between)
+            signals_after = (val_signals != 0).sum()
+            logger.info(f"  Trade cooldown: {min_bars_between} bars, signals {signals_before} -> {signals_after}")
+
+        # Run backtest (with confidence-based position sizing if probs available)
         backtest_engine = BacktestEngine(backtest_config)
+        confidences_series = None
+        if val_probs is not None:
+            confidences_series = pd.Series(val_probs.max(axis=1), index=df_val.index)
+
         backtest_metrics = backtest_engine.run(
             df=df_val,
             signals=pd.Series(val_signals, index=df_val.index),
-            price_column='close'
+            price_column='close',
+            confidences=confidences_series
         )
 
         logger.info(f"  Backtest:")
