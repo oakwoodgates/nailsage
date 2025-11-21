@@ -135,9 +135,14 @@ def train_strategy(config_path: str):
     train_mask = (df_clean['timestamp'] >= config.train_start) & (df_clean['timestamp'] <= config.train_end)
     val_mask = (df_clean['timestamp'] >= config.validation_start) & (df_clean['timestamp'] <= config.validation_end)
 
-    X_train = df_clean[train_mask].drop(columns=['timestamp'])
+    # Exclude OHLCV columns to prevent data leakage (predicting close from close)
+    ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+    feature_cols = [col for col in df_clean.columns if col not in ohlcv_cols]
+    logger.info(f"Using {len(feature_cols)} feature columns (excluded OHLCV)")
+
+    X_train = df_clean[train_mask][feature_cols]
     y_train = target_clean[train_mask]
-    X_val = df_clean[val_mask].drop(columns=['timestamp'])
+    X_val = df_clean[val_mask][feature_cols]
     y_val = target_clean[val_mask]
 
     logger.info(f"Training set: {len(X_train):,} samples")

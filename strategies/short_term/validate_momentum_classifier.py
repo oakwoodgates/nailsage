@@ -29,17 +29,41 @@ from validation.time_series_split import TimeSeriesSplitter
 from validation.walk_forward import WalkForwardValidator
 from utils.logger import get_logger, setup_logger
 
+
+def create_model(model_type: str, params: dict):
+    """Factory function to create ML model based on type."""
+    if model_type == "xgboost":
+        import xgboost as xgb
+        return xgb.XGBClassifier(**params)
+    elif model_type == "lightgbm":
+        import lightgbm as lgb
+        return lgb.LGBMClassifier(**params)
+    elif model_type == "random_forest":
+        from sklearn.ensemble import RandomForestClassifier
+        return RandomForestClassifier(**params)
+    elif model_type == "extra_trees":
+        from sklearn.ensemble import ExtraTreesClassifier
+        return ExtraTreesClassifier(**params)
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
 # Setup logging
 setup_logger(level=20)  # INFO
 logger = get_logger("validation")
 
 
-def convert_predictions_to_signals(predictions: np.ndarray) -> np.ndarray:
+def convert_predictions_to_signals(
+    predictions: np.ndarray,
+    probabilities: np.ndarray = None,
+    confidence_threshold: float = 0.0
+) -> np.ndarray:
     """
-    Convert 3-class predictions to trading signals.
+    Convert 3-class predictions to trading signals with optional confidence filtering.
 
     Args:
         predictions: Array of class predictions (0, 1, 2)
+        probabilities: Array of prediction probabilities (n_samples, n_classes)
+        confidence_threshold: Minimum confidence to generate signal (0.0-1.0)
 
     Returns:
         Array of signals: -1 (short), 0 (neutral), 1 (long)
@@ -48,6 +72,13 @@ def convert_predictions_to_signals(predictions: np.ndarray) -> np.ndarray:
     signals[predictions == 2] = 1   # Long
     signals[predictions == 0] = -1  # Short
     # predictions == 1 stays 0 (neutral)
+
+    # Filter by confidence if threshold is set
+    if probabilities is not None and confidence_threshold > 0:
+        max_probs = probabilities.max(axis=1)
+        low_confidence_mask = max_probs < confidence_threshold
+        signals[low_confidence_mask] = 0  # Set to neutral if low confidence
+
     return signals
 
 
@@ -103,43 +134,49 @@ def validate_strategy(
     config_path: str,
     model_id: str = None,
     n_splits: int = 4,
-    save_results: bool = True
+    save_results: bool = True,
+    retrain: bool = False
 ):
     """
     Run walk-forward validation and backtesting on momentum classifier.
 
     Args:
         config_path: Path to strategy configuration YAML
-        model_id: Model ID to load from registry (if None, uses latest)
+        model_id: Model ID to load from registry (if None, uses latest). Ignored if retrain=True.
         n_splits: Number of walk-forward splits
         save_results: Whether to save results to file
+        retrain: If True, retrain model on each split (true walk-forward). If False, use pre-trained model.
     """
     logger.info(f"Loading configuration from {config_path}")
 
     # Load configuration
     config = StrategyConfig.from_yaml(config_path)
 
-    # Load model from registry
-    registry = ModelRegistry()
-    if model_id:
-        logger.info(f"Loading model {model_id} from registry")
-        model_metadata = registry.get_model(model_id)
-        if model_metadata is None:
-            raise ValueError(f"Model not found: {model_id}")
+    # Load model from registry (only if not retraining)
+    model = None
+    model_metadata = None
+    if not retrain:
+        registry = ModelRegistry()
+        if model_id:
+            logger.info(f"Loading model {model_id} from registry")
+            model_metadata = registry.get_model(model_id)
+            if model_metadata is None:
+                raise ValueError(f"Model not found: {model_id}")
+        else:
+            logger.info("Loading latest model from registry")
+            models = registry.find_models(strategy_name=config.strategy_name)
+            if not models:
+                raise ValueError(f"No models found for strategy {config.strategy_name}")
+            # Sort by training time to get latest
+            models.sort(key=lambda m: m.trained_at, reverse=True)
+            model_metadata = models[0]
+            model_id = model_metadata.model_id
+
+        logger.info(f"Using model: {model_id}")
+        model = joblib.load(model_metadata.model_artifact_path)
     else:
-        logger.info("Loading latest model from registry")
-        models = registry.find_models(strategy_name=config.strategy_name)
-        if not models:
-            raise ValueError(f"No models found for strategy {config.strategy_name}")
-        # Sort by training time to get latest
-        models.sort(key=lambda m: m.trained_at, reverse=True)
-        model_metadata = models[0]
-        model_id = model_metadata.model_id
-
-    logger.info(f"Using model: {model_id}")
-
-    # Load model artifact
-    model = joblib.load(model_metadata.model_artifact_path)
+        logger.info("Retrain mode: will train fresh model on each split")
+        model_id = "retrained_per_split"
 
     # Load and validate data
     logger.info(f"Loading data from {config.data_config.data_dir / config.data_source}")
@@ -183,9 +220,9 @@ def validate_strategy(
     logger.info(f"Clean dataset: {len(df_clean):,} rows")
     logger.info(f"Target distribution: {target_clean.value_counts().to_dict()}")
 
-    # Prepare feature columns (exclude only timestamp to match training)
-    # Note: Training script included OHLCV columns as features
-    feature_cols = [col for col in df_clean.columns if col != 'timestamp']
+    # Prepare feature columns - exclude OHLCV to prevent data leakage
+    ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+    feature_cols = [col for col in df_clean.columns if col not in ohlcv_cols]
 
     logger.info(f"Using {len(feature_cols)} feature columns")
 
@@ -237,9 +274,39 @@ def validate_strategy(
         logger.info(f"  Train samples: {len(X_train):,}")
         logger.info(f"  Val samples: {len(X_val):,}")
 
-        # Generate predictions (model is already trained)
+        # Retrain model on this split's training data if retrain mode
+        if retrain:
+            logger.info(f"  Training fresh {config.model_type_str} model on split {i}...")
+            model = create_model(config.model_type_str, config.model_params)
+
+            # Calculate sample weights if class_weights specified
+            sample_weights = None
+            if hasattr(config.target, 'class_weights') and config.target.class_weights:
+                sample_weights = np.array([config.target.class_weights[label] for label in y_train])
+
+            # Fit model
+            fit_kwargs = {'X': X_train, 'y': y_train}
+            if sample_weights is not None:
+                fit_kwargs['sample_weight'] = sample_weights
+            if config.model_type_str == 'xgboost':
+                fit_kwargs['eval_set'] = [(X_val, y_val)]
+                fit_kwargs['verbose'] = False
+            elif config.model_type_str == 'lightgbm':
+                fit_kwargs['eval_set'] = [(X_val, y_val)]
+
+            model.fit(**fit_kwargs)
+
+        # Generate predictions
         train_preds = model.predict(X_train)
         val_preds = model.predict(X_val)
+
+        # Get prediction probabilities for confidence filtering
+        val_probs = None
+        if hasattr(model, 'predict_proba'):
+            val_probs = model.predict_proba(X_val)
+
+        # Get confidence threshold from config
+        confidence_threshold = getattr(config.target, 'confidence_threshold', 0.0)
 
         # Calculate classification metrics
         train_metrics = calculate_classification_metrics(y_train.values, train_preds)
@@ -249,8 +316,11 @@ def validate_strategy(
         logger.info(f"  Val   Accuracy: {val_metrics['accuracy']:.4f}, F1: {val_metrics['f1_macro']:.4f}, MCC: {val_metrics['matthews_correlation']:.4f}")
         logger.info(f"  Val predictions: {val_metrics['pred_pct_short']:.1%} short, {val_metrics['pred_pct_neutral']:.1%} neutral, {val_metrics['pred_pct_long']:.1%} long")
 
-        # Convert to signals and run backtest
-        val_signals = convert_predictions_to_signals(val_preds)
+        # Convert to signals with confidence filtering
+        val_signals = convert_predictions_to_signals(val_preds, val_probs, confidence_threshold)
+        if confidence_threshold > 0:
+            filtered_pct = (val_signals == 0).sum() / len(val_signals)
+            logger.info(f"  Confidence threshold: {confidence_threshold:.0%}, filtered to neutral: {filtered_pct:.1%}")
 
         # Run backtest
         backtest_engine = BacktestEngine(backtest_config)
@@ -387,6 +457,11 @@ if __name__ == "__main__":
         default=4,
         help="Number of walk-forward splits"
     )
+    parser.add_argument(
+        "--retrain",
+        action="store_true",
+        help="Retrain model on each split (true walk-forward validation)"
+    )
 
     args = parser.parse_args()
 
@@ -394,7 +469,8 @@ if __name__ == "__main__":
         config_path=args.config,
         model_id=args.model_id,
         n_splits=args.n_splits,
-        save_results=True
+        save_results=True,
+        retrain=args.retrain
     )
 
     print("\n" + "=" * 80)
