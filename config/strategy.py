@@ -54,6 +54,12 @@ class TargetSection(BaseConfig):
         default=None,
         description="Class weights for imbalanced classification (e.g., {0: 5.0, 1: 1.0, 2: 5.0})"
     )
+    confidence_threshold: float = Field(
+        default=0.0,
+        description="Minimum prediction confidence to generate signal (0.0-1.0). 0 = no filtering.",
+        ge=0.0,
+        le=1.0
+    )
 
 
 class ModelSection(BaseConfig):
