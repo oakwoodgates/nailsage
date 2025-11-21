@@ -25,7 +25,7 @@ from config.feature import FeatureConfig
 from config.paper_trading import load_paper_trading_config
 from execution.inference.predictor import ModelPredictor
 from execution.inference.signal_generator import SignalGenerator, SignalGeneratorConfig
-from execution.persistence.state_manager import StateManager
+from execution.persistence.state_manager import StateManager, Strategy
 from execution.runner.live_strategy import LiveStrategy, LiveStrategyConfig
 from execution.simulator.order_executor import OrderExecutor, OrderExecutorConfig
 from execution.streaming.candle_buffer import MultiCandleBuffer
@@ -159,19 +159,47 @@ class PaperTradingEngine:
         await predictor.load_model()
 
         # Initialize signal generator
+        # TESTING MODE: Very aggressive settings to generate lots of signals/trades
         signal_gen_config = SignalGeneratorConfig(
             strategy_name="momentum_classifier_v1",
             asset="BTC/USDT",
-            confidence_threshold=0.6,
-            position_size_usd=10000.0,
-            cooldown_bars=4,
+            confidence_threshold=0.3,  # Low threshold = more signals (was 0.6)
+            position_size_usd=1000.0,  # Smaller positions = more trades (was 10000.0)
+            cooldown_bars=0,  # No cooldown = signal every candle (was 4)
             allow_neutral_signals=True,
         )
         signal_generator = SignalGenerator(signal_gen_config)
 
+        # Register strategy in database (required for foreign key constraints)
+        # Check if strategy already exists to avoid UNIQUE constraint violation
+        existing_strategies = self.state_manager.get_active_strategies()
+        strategy_id = None
+        for strat in existing_strategies:
+            if (strat.strategy_name == "momentum_classifier_v1" and
+                strat.version == "1.0" and
+                strat.starlisting_id == self.config.starlisting_btc_usdt_15m):
+                strategy_id = strat.id
+                logger.info(f"  Using existing strategy from database (ID: {strategy_id})")
+                break
+
+        if strategy_id is None:
+            # Strategy doesn't exist, create it
+            strategy_record = Strategy(
+                id=None,  # Will be auto-assigned
+                strategy_name="momentum_classifier_v1",
+                version="1.0",
+                starlisting_id=self.config.starlisting_btc_usdt_15m,
+                interval="15m",
+                model_id=model_metadata.model_id,
+                config_path=None,
+                is_active=True,
+            )
+            strategy_id = self.state_manager.save_strategy(strategy_record)
+            logger.info(f"  Registered new strategy in database (ID: {strategy_id})")
+
         # Create live strategy
         strategy_config = LiveStrategyConfig(
-            strategy_id=1,  # TODO: Get from database
+            strategy_id=strategy_id,  # Use database-assigned ID
             strategy_name="momentum_classifier_v1",
             starlisting_id=self.config.starlisting_btc_usdt_15m,
             asset="BTC/USDT",
@@ -305,6 +333,9 @@ async def main():
         # Run
         await engine.run()
 
+    except KeyboardInterrupt:
+        logger.info("\n\nKeyboard interrupt received (Ctrl+C)")
+        await engine.shutdown()
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         await engine.shutdown()
@@ -312,4 +343,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n\nShutdown complete.")
+        sys.exit(0)

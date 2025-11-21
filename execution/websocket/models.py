@@ -13,7 +13,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MessageType(str, Enum):
@@ -103,14 +103,16 @@ class FundingRate(BaseModel):
     Funding rate data for perpetual futures.
 
     Attributes:
-        timestamp: Timestamp (Unix milliseconds)
+        time: Timestamp string from Kirby (ISO format)
         funding_rate: Funding rate (8-hour rate)
-        starlisting_id: Kirby starlisting ID
+        starlisting_id: Kirby starlisting ID (optional, may not be in data)
     """
 
-    timestamp: int = Field(..., description="Unix timestamp (milliseconds)")
+    model_config = ConfigDict(extra='allow')  # Allow extra fields from Kirby
+
+    time: str = Field(..., description="Timestamp (ISO datetime string)")
     funding_rate: float = Field(..., description="Funding rate (8-hour)")
-    starlisting_id: int = Field(..., description="Kirby starlisting ID")
+    starlisting_id: Optional[int] = Field(default=None, description="Kirby starlisting ID")
 
     @field_validator("funding_rate", mode="before")
     @classmethod
@@ -125,7 +127,13 @@ class FundingRate(BaseModel):
     @property
     def datetime(self) -> datetime:
         """Get timestamp as datetime object."""
-        return datetime.fromtimestamp(self.timestamp / 1000.0)
+        from datetime import datetime as dt
+        return dt.fromisoformat(self.time.replace('Z', '+00:00'))
+
+    @property
+    def timestamp(self) -> int:
+        """Get timestamp in Unix milliseconds."""
+        return int(self.datetime.timestamp() * 1000)
 
 
 class OpenInterest(BaseModel):
@@ -133,14 +141,16 @@ class OpenInterest(BaseModel):
     Open interest data for perpetual futures.
 
     Attributes:
-        timestamp: Timestamp (Unix milliseconds)
+        time: Timestamp string from Kirby (ISO format)
         open_interest: Total open interest (contracts)
-        starlisting_id: Kirby starlisting ID
+        starlisting_id: Kirby starlisting ID (optional, may not be in data)
     """
 
-    timestamp: int = Field(..., description="Unix timestamp (milliseconds)")
+    model_config = ConfigDict(extra='allow')  # Allow extra fields from Kirby
+
+    time: str = Field(..., description="Timestamp (ISO datetime string)")
     open_interest: float = Field(..., description="Total open interest")
-    starlisting_id: int = Field(..., description="Kirby starlisting ID")
+    starlisting_id: Optional[int] = Field(default=None, description="Kirby starlisting ID")
 
     @field_validator("open_interest", mode="before")
     @classmethod
@@ -155,7 +165,13 @@ class OpenInterest(BaseModel):
     @property
     def datetime(self) -> datetime:
         """Get timestamp as datetime object."""
-        return datetime.fromtimestamp(self.timestamp / 1000.0)
+        from datetime import datetime as dt
+        return dt.fromisoformat(self.time.replace('Z', '+00:00'))
+
+    @property
+    def timestamp(self) -> int:
+        """Get timestamp in Unix milliseconds."""
+        return int(self.datetime.timestamp() * 1000)
 
 
 # ============================================================================
@@ -272,9 +288,11 @@ class FundingRateUpdate(BaseModel):
         }
     """
 
+    model_config = ConfigDict(extra='allow')  # Allow extra fields from Kirby
+
     type: Literal[MessageType.FUNDING] = MessageType.FUNDING
     starlisting_id: int = Field(..., description="Starlisting ID")
-    data: FundingRate = Field(..., description="Funding rate data", alias="funding_rate")
+    data: FundingRate = Field(..., description="Funding rate data")
 
     @property
     def funding_rate(self) -> FundingRate:
@@ -298,9 +316,11 @@ class OpenInterestUpdate(BaseModel):
         }
     """
 
+    model_config = ConfigDict(extra='allow')  # Allow extra fields from Kirby
+
     type: Literal[MessageType.OPEN_INTEREST] = MessageType.OPEN_INTEREST
     starlisting_id: int = Field(..., description="Starlisting ID")
-    data: OpenInterest = Field(..., description="Open interest data", alias="open_interest")
+    data: OpenInterest = Field(..., description="Open interest data")
 
     @property
     def open_interest(self) -> OpenInterest:

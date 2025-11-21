@@ -15,6 +15,7 @@ All timestamps are stored as Unix milliseconds for consistency with Kirby API.
 import json
 import logging
 import sqlite3
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -135,6 +136,7 @@ class StateManager:
         """
         self.db_path = Path(db_path)
         self._conn: Optional[sqlite3.Connection] = None
+        self._lock = threading.Lock()  # Thread-safe access to SQLite
 
         # Ensure database directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -532,40 +534,44 @@ class StateManager:
         Returns:
             Signal ID
         """
-        now = int(datetime.now().timestamp() * 1000)
+        with self._lock:  # Thread-safe access to SQLite
+            now = int(datetime.now().timestamp() * 1000)
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
+            conn = self._get_connection()
+            cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            INSERT INTO signals
-            (strategy_id, starlisting_id, signal_type, confidence, price_at_signal,
-             timestamp, was_executed, rejection_reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                signal.strategy_id,
-                signal.starlisting_id,
-                signal.signal_type,
-                signal.confidence,
-                signal.price_at_signal,
-                signal.timestamp,
-                signal.was_executed,
-                signal.rejection_reason,
-                now,
-            ),
-        )
+            # Convert all parameters to native Python types (Python 3.13+ compatibility)
+            params = (
+                int(signal.strategy_id),
+                int(signal.starlisting_id),
+                str(signal.signal_type),
+                float(signal.confidence) if signal.confidence is not None else None,
+                float(signal.price_at_signal),
+                int(signal.timestamp),
+                int(signal.was_executed),  # Convert bool to int for SQLite
+                str(signal.rejection_reason) if signal.rejection_reason is not None else None,
+                int(now),
+            )
 
-        signal_id = cursor.lastrowid
-        conn.commit()
+            cursor.execute(
+                """
+                INSERT INTO signals
+                (strategy_id, starlisting_id, signal_type, confidence, price_at_signal,
+                 timestamp, was_executed, rejection_reason, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                params,
+            )
 
-        logger.debug(
-            f"Saved signal: {signal.signal_type} @ {signal.price_at_signal:.2f} "
-            f"(ID: {signal_id})"
-        )
+            signal_id = cursor.lastrowid
+            conn.commit()
 
-        return signal_id
+            logger.debug(
+                f"Saved signal: {signal.signal_type} @ {signal.price_at_signal:.2f} "
+                f"(ID: {signal_id})"
+            )
+
+            return signal_id
 
     # ========================================================================
     # State Snapshot Methods
