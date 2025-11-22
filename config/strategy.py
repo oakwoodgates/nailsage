@@ -54,6 +54,12 @@ class TargetSection(BaseConfig):
         default=None,
         description="Class weights for imbalanced classification (e.g., {0: 5.0, 1: 1.0, 2: 5.0})"
     )
+    confidence_threshold: float = Field(
+        default=0.0,
+        description="Minimum prediction confidence to generate signal (0.0-1.0). 0 = no filtering.",
+        ge=0.0,
+        le=1.0
+    )
 
 
 class ModelSection(BaseConfig):
@@ -79,6 +85,11 @@ class BacktestSection(BaseConfig):
     slippage_bps: int = Field(default=2, description="Slippage in basis points", ge=0)
     leverage: int = Field(default=1, description="Leverage", ge=1)
     capital: float = Field(default=10000, description="Starting capital", gt=0.0)
+    min_bars_between_trades: int = Field(
+        default=0,
+        description="Minimum bars between trades (cooldown). 0 = no cooldown.",
+        ge=0
+    )
 
 
 class RiskSection(BaseConfig):

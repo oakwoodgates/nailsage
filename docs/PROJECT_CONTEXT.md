@@ -208,17 +208,20 @@ nailsage/                      # Project root
 - Comprehensive strategy guide (docs/STRATEGY_GUIDE.md)
 
 ## Current Status
-**Phase**: First Strategy Trained ✨ (19/25 milestones, 76%)
-**Lines of Code**: ~5,500+ (production-ready)
-**Next Milestone**: Second strategy to prove modularity
+**Phase**: MVP Complete ✅ (35/35 milestones, 100%)
+**Lines of Code**: ~8,000+ (production-ready)
+**Test Coverage**: 145 passing unit tests
+**Next Milestone**: Production validation with extended paper trading
 
-## Working End-to-End
-The complete ML pipeline is operational:
+## Complete ML & Trading Pipeline
+The full system is operational end-to-end:
 1. Load and validate data ✅ (with metadata tracking)
-2. Compute features dynamically ✅ (8 indicators, caching enabled)
+2. Compute features dynamically ✅ (10 indicators, caching enabled)
 3. Split data with no leakage ✅ (TimeSeriesSplitter)
-4. Train ML models ✅ (XGBoost trained, registered, tracked)
+4. Train ML models ✅ (Multi-algorithm support: XGBoost, LightGBM, RandomForest, ExtraTrees)
 5. Track complete provenance ✅ (Dataset + Model metadata with hybrid IDs)
 6. Query and compare models ✅ (ModelRegistry with config-aware queries)
-7. Next up: Backtest simulation (BacktestEngine ready)
-8. Next up: Walk-forward validation (WalkForwardValidator ready)
+7. Backtest simulation ✅ (BacktestEngine with realistic fees/slippage)
+8. Walk-forward validation ✅ (WalkForwardValidator with retrain support)
+9. Paper trading infrastructure ✅ (WebSocket client, live inference, state persistence)
+10. Model quality improvements ✅ (Binary classification, confidence sizing, cooldown, hyperopt)

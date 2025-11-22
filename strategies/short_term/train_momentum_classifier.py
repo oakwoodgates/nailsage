@@ -16,7 +16,7 @@ from data.loader import DataLoader
 from data.validator import DataValidator
 from features.engine import FeatureEngine
 from models import ModelRegistry, create_model_metadata
-from targets.classification import create_3class_target
+from targets.classification import create_3class_target, create_binary_target
 from validation.time_series_split import TimeSeriesSplitter
 from utils.logger import get_logger, setup_logger
 
@@ -115,13 +115,22 @@ def train_strategy(config_path: str):
 
     logger.info(f"Generated {len(df_features.columns)} features")
 
-    # Create target variable
-    logger.info("Creating target variable...")
-    target = create_3class_target(
-        df_features,
-        lookahead_bars=config.target_lookahead_bars,
-        threshold_pct=config.target_threshold_pct
-    )
+    # Create target variable based on number of classes
+    num_classes = config.target.classes or 3
+    logger.info(f"Creating {num_classes}-class target variable...")
+
+    if num_classes == 2:
+        target = create_binary_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
+    else:
+        target = create_3class_target(
+            df_features,
+            lookahead_bars=config.target_lookahead_bars,
+            threshold_pct=config.target_threshold_pct
+        )
 
     # Remove rows with NaN (from lookahead and feature computation)
     valid_idx = target.notna() & df_features.notna().all(axis=1)
@@ -135,9 +144,14 @@ def train_strategy(config_path: str):
     train_mask = (df_clean['timestamp'] >= config.train_start) & (df_clean['timestamp'] <= config.train_end)
     val_mask = (df_clean['timestamp'] >= config.validation_start) & (df_clean['timestamp'] <= config.validation_end)
 
-    X_train = df_clean[train_mask].drop(columns=['timestamp'])
+    # Exclude OHLCV columns to prevent data leakage (predicting close from close)
+    ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+    feature_cols = [col for col in df_clean.columns if col not in ohlcv_cols]
+    logger.info(f"Using {len(feature_cols)} feature columns (excluded OHLCV)")
+
+    X_train = df_clean[train_mask][feature_cols]
     y_train = target_clean[train_mask]
-    X_val = df_clean[val_mask].drop(columns=['timestamp'])
+    X_val = df_clean[val_mask][feature_cols]
     y_val = target_clean[val_mask]
 
     logger.info(f"Training set: {len(X_train):,} samples")

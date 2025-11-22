@@ -1,0 +1,98 @@
+# Strategy metadata
+strategy_name: sol_swing_momentum
+version: v1
+strategy_timeframe: long_term
+description: "SOL swing trading on 4H timeframe with momentum"
+
+# Data configuration - SOL 4H data
+data:
+  source_file: "merged_binance_SOL_USDT_perps_4h_20251116_031012.parquet"
+  resample_interval: null  # Already 4H, no resampling needed
+  train_start: "2024-01-01"
+  train_end: "2025-08-15"
+  validation_start: "2025-08-16"
+  validation_end: "2025-11-15"
+
+# Feature configuration - swing trading focused
+features:
+  indicators:
+    # Trend structure
+    - name: ema_12
+      type: EMA
+      params: {window: 12}
+    - name: ema_26
+      type: EMA
+      params: {window: 26}
+    - name: ema_50
+      type: EMA
+      params: {window: 50}
+    - name: sma_200
+      type: SMA
+      params: {window: 200}
+
+    # Momentum
+    - name: rsi_14
+      type: RSI
+      params: {window: 14}
+    - name: macd
+      type: MACD
+      params: {fast: 12, slow: 26, signal: 9}
+    - name: roc_12
+      type: ROC
+      params: {window: 12}
+
+    # Volatility
+    - name: bollinger
+      type: BollingerBands
+      params: {window: 20, num_std: 2}
+    - name: atr_14
+      type: ATR
+      params: {window: 14}
+
+    # Volume
+    - name: volume_ma_20
+      type: VolumeMA
+      params: {window: 20}
+
+# Target - longer lookahead for swing trades
+target:
+  type: classification
+  classes: 3
+  lookahead_bars: 6  # 24 hours (6 x 4H bars)
+  threshold_pct: 1.5  # Larger moves for swing trades
+  class_weights: {0: 8.0, 1: 1.0, 2: 8.0}
+  confidence_threshold: 0.5  # Only trade when >50% confident
+
+# Model - Random Forest for robustness
+model:
+  type: random_forest
+  params:
+    n_estimators: 200
+    max_depth: 8
+    min_samples_split: 10
+    min_samples_leaf: 5
+    max_features: "sqrt"
+    class_weight: "balanced"
+    random_state: 42
+    n_jobs: -1
+
+# Validation
+validation:
+  method: walk_forward
+  n_splits: 3  # Fewer splits due to less data
+  expanding_window: true
+  gap_bars: 0
+
+# Backtest
+backtest:
+  transaction_cost_pct: 0.04
+  slippage_bps: 3  # Slightly higher for SOL
+  leverage: 2
+  capital: 10000
+  min_bars_between_trades: 4  # 16 hours cooldown (4 x 4H bars)
+
+# Risk - wider stops for swing
+risk:
+  max_position_size_pct: 100
+  stop_loss_pct: 3.0
+  take_profit_pct: 5.0

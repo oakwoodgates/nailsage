@@ -176,7 +176,7 @@ class CandleBuffer:
             n: Number of recent candles to include (None = all)
 
         Returns:
-            DataFrame with columns: timestamp, open, high, low, close, volume
+            DataFrame with columns: timestamp, open, high, low, close, volume, num_trades
             Index is datetime (from timestamp)
 
         Raises:
@@ -200,6 +200,7 @@ class CandleBuffer:
                 "low": [c.low for c in candles],
                 "close": [c.close for c in candles],
                 "volume": [c.volume for c in candles],
+                "num_trades": [c.num_trades if c.num_trades is not None else 0 for c in candles],
             }
             df = pd.DataFrame(data)
 
