@@ -45,6 +45,12 @@ dependencies = [
     "tqdm>=4.66.0",  # Progress bars
     "joblib>=1.3.0",  # Model serialization
 
+    # API (Dashboard backend)
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "websockets>=12.0",  # WebSocket support for live updates
+    "psycopg2-binary>=2.9.0",  # PostgreSQL driver
+
     # Date/Time
     "python-dateutil>=2.8.0",
     "pytz>=2023.3",
