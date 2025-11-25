@@ -1,0 +1,136 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+pytest_debug.log
+
+# Data files (should be mounted as volumes instead)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Models (should be mounted as volumes instead)
+models/trained/*
+models/metadata/*
+!models/trained/.gitkeep
+!models/metadata/.gitkeep
+
+# Features cache (regenerated at runtime)
+features/cache/*
+!features/cache/.gitkeep
+
+# Database files (Postgres will be in container)
+*.db
+*.sqlite
+*.sqlite3
+execution/state/*.db
+
+# Logs (should be mounted as volumes or use Docker logs)
+logs/
+*.log
+
+# Results and experiments (not needed in container)
+results/
+experiments/
+
+# Documentation (not needed in production image)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+.pre-commit-config.yaml
+pytest.ini
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment files (secrets should never be in image)
+.env
+.env.*
+!.env.example
+*secret*
+*credentials*
+*key*.json
+*.pem
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Large data files
+*.parquet
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Backups
+*.bak
+*.backup
