@@ -10,17 +10,23 @@ This module provides database access for tracking:
 - Event logs
 
 All timestamps are stored as Unix milliseconds for consistency with Kirby API.
+
+Supports both SQLite (local development) and PostgreSQL (production) via SQLAlchemy.
 """
 
 import json
 import logging
-import sqlite3
+import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool, QueuePool
 
 logger = logging.getLogger(__name__)
 
@@ -122,52 +128,94 @@ class StateManager:
     This class provides ACID-compliant storage for all paper trading state,
     enabling crash recovery and performance tracking.
 
+    Supports both SQLite (local development) and PostgreSQL (production).
+
     Attributes:
-        db_path: Path to SQLite database file
-        _conn: Database connection (lazily created)
+        database_url: Database connection string (SQLite or PostgreSQL)
+        _engine: SQLAlchemy engine (lazily created)
     """
 
-    def __init__(self, db_path: Path | str):
+    def __init__(self, database_url: Optional[str] = None, db_path: Optional[Path | str] = None):
         """
         Initialize state manager.
 
         Args:
-            db_path: Path to SQLite database file
+            database_url: Database URL (e.g., postgresql://user:pass@host/db or sqlite:///path/to/db.db)
+                         If not provided, uses DATABASE_URL env var or falls back to db_path
+            db_path: Legacy parameter for SQLite path (for backwards compatibility)
         """
-        self.db_path = Path(db_path)
-        self._conn: Optional[sqlite3.Connection] = None
-        self._lock = threading.Lock()  # Thread-safe access to SQLite
+        # Determine database URL
+        if database_url:
+            self.database_url = database_url
+        elif os.getenv('DATABASE_URL'):
+            self.database_url = os.getenv('DATABASE_URL')
+        elif db_path:
+            # Convert legacy db_path to SQLite URL
+            db_path = Path(db_path)
+            # Ensure directory exists for SQLite
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.database_url = f"sqlite:///{db_path}"
+        else:
+            raise ValueError("Either database_url, DATABASE_URL env var, or db_path must be provided")
 
-        # Ensure database directory exists
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._engine: Optional[Engine] = None
+        self._lock = threading.Lock()  # Thread-safe access
 
-        # Initialize database if it doesn't exist
-        if not self.db_path.exists():
-            logger.info(f"Creating new database at {self.db_path}")
+        logger.info(f"Initializing StateManager with database: {self._get_safe_url()}")
+
+        # Get engine and validate connection
+        engine = self._get_engine()
+
+        # Check if schema exists, initialize if needed
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+
+        if 'strategies' not in tables:
+            logger.info("Database tables not found, initializing schema")
             self._initialize_database()
         else:
-            logger.info(f"Using existing database at {self.db_path}")
+            logger.info(f"Database schema verified ({len(tables)} tables found)")
 
-        # Validate connection
-        self._get_connection()
+    def _get_safe_url(self) -> str:
+        """Get database URL with password masked for logging."""
+        url = self.database_url
+        if '://' in url and '@' in url:
+            # Mask password in postgresql://user:password@host/db
+            protocol, rest = url.split('://', 1)
+            if '@' in rest:
+                credentials, host = rest.split('@', 1)
+                if ':' in credentials:
+                    user, _ = credentials.split(':', 1)
+                    return f"{protocol}://{user}:***@{host}"
+        return url
 
-    def _get_connection(self) -> sqlite3.Connection:
+    def _get_engine(self) -> Engine:
         """
-        Get or create database connection.
+        Get or create SQLAlchemy engine.
 
         Returns:
-            SQLite connection
+            SQLAlchemy engine
         """
-        if self._conn is None:
-            self._conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,  # Allow use from multiple threads
-            )
-            self._conn.row_factory = sqlite3.Row  # Access columns by name
-            # Enable foreign keys
-            self._conn.execute("PRAGMA foreign_keys = ON")
+        if self._engine is None:
+            # Configure connection pooling based on database type
+            if self.database_url.startswith('sqlite'):
+                # SQLite: Use NullPool (no pooling) to avoid connection issues
+                self._engine = create_engine(
+                    self.database_url,
+                    poolclass=NullPool,
+                    connect_args={"check_same_thread": False},
+                )
+            else:
+                # PostgreSQL: Use connection pooling
+                self._engine = create_engine(
+                    self.database_url,
+                    poolclass=QueuePool,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_pre_ping=True,  # Verify connections before using
+                )
 
-        return self._conn
+        return self._engine
 
     def _initialize_database(self) -> None:
         """Initialize database schema from schema.sql file."""
@@ -179,9 +227,14 @@ class StateManager:
         with open(schema_path, "r") as f:
             schema_sql = f.read()
 
-        conn = self._get_connection()
-        conn.executescript(schema_sql)
-        conn.commit()
+        engine = self._get_engine()
+
+        # Execute schema SQL
+        with engine.begin() as conn:
+            # Split by semicolon for PostgreSQL compatibility
+            statements = [s.strip() for s in schema_sql.split(';') if s.strip()]
+            for statement in statements:
+                conn.execute(text(statement))
 
         logger.info("Database schema initialized")
 
@@ -196,21 +249,20 @@ class StateManager:
                 state_manager.save_trade(trade)
             # Automatically commits on success, rolls back on exception
         """
-        conn = self._get_connection()
-        try:
-            yield conn
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Transaction failed, rolling back: {e}")
-            raise
+        engine = self._get_engine()
+        with engine.begin() as conn:
+            try:
+                yield conn
+            except Exception as e:
+                logger.error(f"Transaction failed, rolling back: {e}")
+                raise
 
     def close(self) -> None:
         """Close database connection."""
-        if self._conn:
-            self._conn.close()
-            self._conn = None
-            logger.info("Database connection closed")
+        if self._engine:
+            self._engine.dispose()
+            self._engine = None
+            logger.info("Database connections closed")
 
     # ========================================================================
     # Strategy Methods
@@ -228,57 +280,58 @@ class StateManager:
         """
         now = int(datetime.now().timestamp() * 1000)
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        if strategy.id is None:
-            # Insert new strategy
-            cursor.execute(
-                """
-                INSERT INTO strategies
-                (strategy_name, version, starlisting_id, interval, model_id, config_path,
-                 is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    strategy.strategy_name,
-                    strategy.version,
-                    strategy.starlisting_id,
-                    strategy.interval,
-                    strategy.model_id,
-                    strategy.config_path,
-                    strategy.is_active,
-                    now,
-                    now,
-                ),
-            )
-            strategy_id = cursor.lastrowid
-            logger.info(f"Saved new strategy: {strategy.strategy_name} v{strategy.version} (ID: {strategy_id})")
-        else:
-            # Update existing strategy
-            cursor.execute(
-                """
-                UPDATE strategies
-                SET strategy_name = ?, version = ?, starlisting_id = ?, interval = ?,
-                    model_id = ?, config_path = ?, is_active = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    strategy.strategy_name,
-                    strategy.version,
-                    strategy.starlisting_id,
-                    strategy.interval,
-                    strategy.model_id,
-                    strategy.config_path,
-                    strategy.is_active,
-                    now,
-                    strategy.id,
-                ),
-            )
-            strategy_id = strategy.id
-            logger.debug(f"Updated strategy ID {strategy_id}")
+        with engine.begin() as conn:
+            if strategy.id is None:
+                # Insert new strategy
+                result = conn.execute(
+                    text("""
+                        INSERT INTO strategies
+                        (strategy_name, version, starlisting_id, interval, model_id, config_path,
+                         is_active, created_at, updated_at)
+                        VALUES (:strategy_name, :version, :starlisting_id, :interval, :model_id,
+                                :config_path, :is_active, :created_at, :updated_at)
+                    """),
+                    {
+                        "strategy_name": strategy.strategy_name,
+                        "version": strategy.version,
+                        "starlisting_id": strategy.starlisting_id,
+                        "interval": strategy.interval,
+                        "model_id": strategy.model_id,
+                        "config_path": strategy.config_path,
+                        "is_active": strategy.is_active,
+                        "created_at": now,
+                        "updated_at": now,
+                    },
+                )
+                strategy_id = result.lastrowid
+                logger.info(f"Saved new strategy: {strategy.strategy_name} v{strategy.version} (ID: {strategy_id})")
+            else:
+                # Update existing strategy
+                conn.execute(
+                    text("""
+                        UPDATE strategies
+                        SET strategy_name = :strategy_name, version = :version, starlisting_id = :starlisting_id,
+                            interval = :interval, model_id = :model_id, config_path = :config_path,
+                            is_active = :is_active, updated_at = :updated_at
+                        WHERE id = :id
+                    """),
+                    {
+                        "strategy_name": strategy.strategy_name,
+                        "version": strategy.version,
+                        "starlisting_id": strategy.starlisting_id,
+                        "interval": strategy.interval,
+                        "model_id": strategy.model_id,
+                        "config_path": strategy.config_path,
+                        "is_active": strategy.is_active,
+                        "updated_at": now,
+                        "id": strategy.id,
+                    },
+                )
+                strategy_id = strategy.id
+                logger.debug(f"Updated strategy ID {strategy_id}")
 
-        conn.commit()
         return strategy_id
 
     def get_active_strategies(self) -> List[Strategy]:
@@ -288,37 +341,40 @@ class StateManager:
         Returns:
             List of active strategies
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        cursor.execute("SELECT * FROM strategies WHERE is_active = 1")
-        rows = cursor.fetchall()
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT * FROM strategies WHERE is_active = TRUE"))
+            rows = result.fetchall()
 
         return [self._row_to_strategy(row) for row in rows]
 
     def get_strategy_by_id(self, strategy_id: int) -> Optional[Strategy]:
         """Get strategy by ID."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        cursor.execute("SELECT * FROM strategies WHERE id = ?", (strategy_id,))
-        row = cursor.fetchone()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT * FROM strategies WHERE id = :id"),
+                {"id": strategy_id}
+            )
+            row = result.fetchone()
 
         return self._row_to_strategy(row) if row else None
 
-    def _row_to_strategy(self, row: sqlite3.Row) -> Strategy:
+    def _row_to_strategy(self, row) -> Strategy:
         """Convert database row to Strategy object."""
         return Strategy(
-            id=row["id"],
-            strategy_name=row["strategy_name"],
-            version=row["version"],
-            starlisting_id=row["starlisting_id"],
-            interval=row["interval"],
-            model_id=row["model_id"],
-            config_path=row["config_path"],
-            is_active=bool(row["is_active"]),
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
+            id=row.id if hasattr(row, 'id') else row[0],
+            strategy_name=row.strategy_name if hasattr(row, 'strategy_name') else row[1],
+            version=row.version if hasattr(row, 'version') else row[2],
+            starlisting_id=row.starlisting_id if hasattr(row, 'starlisting_id') else row[3],
+            interval=row.interval if hasattr(row, 'interval') else row[4],
+            model_id=row.model_id if hasattr(row, 'model_id') else row[5],
+            config_path=row.config_path if hasattr(row, 'config_path') else row[6],
+            is_active=bool(row.is_active if hasattr(row, 'is_active') else row[7]),
+            created_at=row.created_at if hasattr(row, 'created_at') else row[8],
+            updated_at=row.updated_at if hasattr(row, 'updated_at') else row[9],
         )
 
     # ========================================================================
@@ -336,80 +392,81 @@ class StateManager:
             Position ID
         """
         now = int(datetime.now().timestamp() * 1000)
+        engine = self._get_engine()
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with engine.begin() as conn:
+            if position.id is None:
+                # Insert new position
+                result = conn.execute(
+                    text("""
+                        INSERT INTO positions
+                        (strategy_id, starlisting_id, side, size, entry_price, entry_timestamp,
+                         exit_price, exit_timestamp, realized_pnl, unrealized_pnl, fees_paid,
+                         status, stop_loss_price, take_profit_price, exit_reason, created_at, updated_at)
+                        VALUES (:strategy_id, :starlisting_id, :side, :size, :entry_price, :entry_timestamp,
+                                :exit_price, :exit_timestamp, :realized_pnl, :unrealized_pnl, :fees_paid,
+                                :status, :stop_loss_price, :take_profit_price, :exit_reason, :created_at, :updated_at)
+                    """),
+                    {
+                        "strategy_id": position.strategy_id,
+                        "starlisting_id": position.starlisting_id,
+                        "side": position.side,
+                        "size": position.size,
+                        "entry_price": position.entry_price,
+                        "entry_timestamp": position.entry_timestamp,
+                        "exit_price": position.exit_price,
+                        "exit_timestamp": position.exit_timestamp,
+                        "realized_pnl": position.realized_pnl,
+                        "unrealized_pnl": position.unrealized_pnl,
+                        "fees_paid": position.fees_paid,
+                        "status": position.status,
+                        "stop_loss_price": position.stop_loss_price,
+                        "take_profit_price": position.take_profit_price,
+                        "exit_reason": position.exit_reason,
+                        "created_at": now,
+                        "updated_at": now,
+                    },
+                )
+                position_id = result.lastrowid
+                logger.info(
+                    f"Saved new position: {position.side} {position.size:.2f} @ {position.entry_price:.2f} "
+                    f"(ID: {position_id})"
+                )
+            else:
+                # Update existing position
+                conn.execute(
+                    text("""
+                        UPDATE positions
+                        SET strategy_id = :strategy_id, starlisting_id = :starlisting_id, side = :side, size = :size,
+                            entry_price = :entry_price, entry_timestamp = :entry_timestamp, exit_price = :exit_price,
+                            exit_timestamp = :exit_timestamp, realized_pnl = :realized_pnl, unrealized_pnl = :unrealized_pnl,
+                            fees_paid = :fees_paid, status = :status, stop_loss_price = :stop_loss_price,
+                            take_profit_price = :take_profit_price, exit_reason = :exit_reason, updated_at = :updated_at
+                        WHERE id = :id
+                    """),
+                    {
+                        "strategy_id": position.strategy_id,
+                        "starlisting_id": position.starlisting_id,
+                        "side": position.side,
+                        "size": position.size,
+                        "entry_price": position.entry_price,
+                        "entry_timestamp": position.entry_timestamp,
+                        "exit_price": position.exit_price,
+                        "exit_timestamp": position.exit_timestamp,
+                        "realized_pnl": position.realized_pnl,
+                        "unrealized_pnl": position.unrealized_pnl,
+                        "fees_paid": position.fees_paid,
+                        "status": position.status,
+                        "stop_loss_price": position.stop_loss_price,
+                        "take_profit_price": position.take_profit_price,
+                        "exit_reason": position.exit_reason,
+                        "updated_at": now,
+                        "id": position.id,
+                    },
+                )
+                position_id = position.id
+                logger.debug(f"Updated position ID {position_id}")
 
-        if position.id is None:
-            # Insert new position
-            cursor.execute(
-                """
-                INSERT INTO positions
-                (strategy_id, starlisting_id, side, size, entry_price, entry_timestamp,
-                 exit_price, exit_timestamp, realized_pnl, unrealized_pnl, fees_paid,
-                 status, stop_loss_price, take_profit_price, exit_reason, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    position.strategy_id,
-                    position.starlisting_id,
-                    position.side,
-                    position.size,
-                    position.entry_price,
-                    position.entry_timestamp,
-                    position.exit_price,
-                    position.exit_timestamp,
-                    position.realized_pnl,
-                    position.unrealized_pnl,
-                    position.fees_paid,
-                    position.status,
-                    position.stop_loss_price,
-                    position.take_profit_price,
-                    position.exit_reason,
-                    now,
-                    now,
-                ),
-            )
-            position_id = cursor.lastrowid
-            logger.info(
-                f"Saved new position: {position.side} {position.size:.2f} @ {position.entry_price:.2f} "
-                f"(ID: {position_id})"
-            )
-        else:
-            # Update existing position
-            cursor.execute(
-                """
-                UPDATE positions
-                SET strategy_id = ?, starlisting_id = ?, side = ?, size = ?,
-                    entry_price = ?, entry_timestamp = ?, exit_price = ?, exit_timestamp = ?,
-                    realized_pnl = ?, unrealized_pnl = ?, fees_paid = ?, status = ?,
-                    stop_loss_price = ?, take_profit_price = ?, exit_reason = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    position.strategy_id,
-                    position.starlisting_id,
-                    position.side,
-                    position.size,
-                    position.entry_price,
-                    position.entry_timestamp,
-                    position.exit_price,
-                    position.exit_timestamp,
-                    position.realized_pnl,
-                    position.unrealized_pnl,
-                    position.fees_paid,
-                    position.status,
-                    position.stop_loss_price,
-                    position.take_profit_price,
-                    position.exit_reason,
-                    now,
-                    position.id,
-                ),
-            )
-            position_id = position.id
-            logger.debug(f"Updated position ID {position_id}")
-
-        conn.commit()
         return position_id
 
     def get_open_positions(self, strategy_id: Optional[int] = None) -> List[Position]:
@@ -422,31 +479,35 @@ class StateManager:
         Returns:
             List of open positions
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        if strategy_id is not None:
-            cursor.execute(
-                "SELECT * FROM positions WHERE status = 'open' AND strategy_id = ?",
-                (strategy_id,),
-            )
-        else:
-            cursor.execute("SELECT * FROM positions WHERE status = 'open'")
+        with engine.connect() as conn:
+            if strategy_id is not None:
+                result = conn.execute(
+                    text("SELECT * FROM positions WHERE status = 'open' AND strategy_id = :strategy_id"),
+                    {"strategy_id": strategy_id},
+                )
+            else:
+                result = conn.execute(text("SELECT * FROM positions WHERE status = 'open'"))
 
-        rows = cursor.fetchall()
+            rows = result.fetchall()
+
         return [self._row_to_position(row) for row in rows]
 
     def get_position_by_id(self, position_id: int) -> Optional[Position]:
         """Get position by ID."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        cursor.execute("SELECT * FROM positions WHERE id = ?", (position_id,))
-        row = cursor.fetchone()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT * FROM positions WHERE id = :position_id"),
+                {"position_id": position_id}
+            )
+            row = result.fetchone()
 
         return self._row_to_position(row) if row else None
 
-    def _row_to_position(self, row: sqlite3.Row) -> Position:
+    def _row_to_position(self, row: Any) -> Position:
         """Convert database row to Position object."""
         return Position(
             id=row["id"],
@@ -484,34 +545,32 @@ class StateManager:
             Trade ID
         """
         now = int(datetime.now().timestamp() * 1000)
+        engine = self._get_engine()
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            INSERT INTO trades
-            (position_id, strategy_id, starlisting_id, trade_type, size, price,
-             fees, slippage, timestamp, signal_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                trade.position_id,
-                trade.strategy_id,
-                trade.starlisting_id,
-                trade.trade_type,
-                trade.size,
-                trade.price,
-                trade.fees,
-                trade.slippage,
-                trade.timestamp,
-                trade.signal_id,
-                now,
-            ),
-        )
-
-        trade_id = cursor.lastrowid
-        conn.commit()
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("""
+                    INSERT INTO trades
+                    (position_id, strategy_id, starlisting_id, trade_type, size, price,
+                     fees, slippage, timestamp, signal_id, created_at)
+                    VALUES (:position_id, :strategy_id, :starlisting_id, :trade_type, :size, :price,
+                            :fees, :slippage, :timestamp, :signal_id, :created_at)
+                """),
+                {
+                    "position_id": trade.position_id,
+                    "strategy_id": trade.strategy_id,
+                    "starlisting_id": trade.starlisting_id,
+                    "trade_type": trade.trade_type,
+                    "size": trade.size,
+                    "price": trade.price,
+                    "fees": trade.fees,
+                    "slippage": trade.slippage,
+                    "timestamp": trade.timestamp,
+                    "signal_id": trade.signal_id,
+                    "created_at": now,
+                },
+            )
+            trade_id = result.lastrowid
 
         logger.info(
             f"Saved trade: {trade.trade_type} {trade.size:.2f} @ {trade.price:.2f} "
@@ -534,37 +593,32 @@ class StateManager:
         Returns:
             Signal ID
         """
-        with self._lock:  # Thread-safe access to SQLite
+        with self._lock:  # Thread-safe access
             now = int(datetime.now().timestamp() * 1000)
+            engine = self._get_engine()
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            # Convert all parameters to native Python types (Python 3.13+ compatibility)
-            params = (
-                int(signal.strategy_id),
-                int(signal.starlisting_id),
-                str(signal.signal_type),
-                float(signal.confidence) if signal.confidence is not None else None,
-                float(signal.price_at_signal),
-                int(signal.timestamp),
-                int(signal.was_executed),  # Convert bool to int for SQLite
-                str(signal.rejection_reason) if signal.rejection_reason is not None else None,
-                int(now),
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO signals
-                (strategy_id, starlisting_id, signal_type, confidence, price_at_signal,
-                 timestamp, was_executed, rejection_reason, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                params,
-            )
-
-            signal_id = cursor.lastrowid
-            conn.commit()
+            with engine.begin() as conn:
+                result = conn.execute(
+                    text("""
+                        INSERT INTO signals
+                        (strategy_id, starlisting_id, signal_type, confidence, price_at_signal,
+                         timestamp, was_executed, rejection_reason, created_at)
+                        VALUES (:strategy_id, :starlisting_id, :signal_type, :confidence, :price_at_signal,
+                                :timestamp, :was_executed, :rejection_reason, :created_at)
+                    """),
+                    {
+                        "strategy_id": signal.strategy_id,
+                        "starlisting_id": signal.starlisting_id,
+                        "signal_type": signal.signal_type,
+                        "confidence": signal.confidence,
+                        "price_at_signal": signal.price_at_signal,
+                        "timestamp": signal.timestamp,
+                        "was_executed": signal.was_executed,
+                        "rejection_reason": signal.rejection_reason,
+                        "created_at": now,
+                    },
+                )
+                signal_id = result.lastrowid
 
             logger.debug(
                 f"Saved signal: {signal.signal_type} @ {signal.price_at_signal:.2f} "
@@ -588,32 +642,30 @@ class StateManager:
             Snapshot ID
         """
         now = int(datetime.now().timestamp() * 1000)
+        engine = self._get_engine()
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            INSERT INTO state_snapshots
-            (total_equity, available_capital, allocated_capital, total_unrealized_pnl,
-             total_realized_pnl, num_open_positions, num_strategies_active, timestamp, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                snapshot.total_equity,
-                snapshot.available_capital,
-                snapshot.allocated_capital,
-                snapshot.total_unrealized_pnl,
-                snapshot.total_realized_pnl,
-                snapshot.num_open_positions,
-                snapshot.num_strategies_active,
-                snapshot.timestamp,
-                now,
-            ),
-        )
-
-        snapshot_id = cursor.lastrowid
-        conn.commit()
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("""
+                    INSERT INTO state_snapshots
+                    (total_equity, available_capital, allocated_capital, total_unrealized_pnl,
+                     total_realized_pnl, num_open_positions, num_strategies_active, timestamp, created_at)
+                    VALUES (:total_equity, :available_capital, :allocated_capital, :total_unrealized_pnl,
+                            :total_realized_pnl, :num_open_positions, :num_strategies_active, :timestamp, :created_at)
+                """),
+                {
+                    "total_equity": snapshot.total_equity,
+                    "available_capital": snapshot.available_capital,
+                    "allocated_capital": snapshot.allocated_capital,
+                    "total_unrealized_pnl": snapshot.total_unrealized_pnl,
+                    "total_realized_pnl": snapshot.total_realized_pnl,
+                    "num_open_positions": snapshot.num_open_positions,
+                    "num_strategies_active": snapshot.num_strategies_active,
+                    "timestamp": snapshot.timestamp,
+                    "created_at": now,
+                },
+            )
+            snapshot_id = result.lastrowid
 
         logger.debug(
             f"Saved snapshot: equity={snapshot.total_equity:.2f}, "
@@ -624,28 +676,28 @@ class StateManager:
 
     def get_latest_snapshot(self) -> Optional[StateSnapshot]:
         """Get the most recent state snapshot."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        engine = self._get_engine()
 
-        cursor.execute(
-            "SELECT * FROM state_snapshots ORDER BY timestamp DESC LIMIT 1"
-        )
-        row = cursor.fetchone()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT * FROM state_snapshots ORDER BY timestamp DESC LIMIT 1")
+            )
+            row = result.fetchone()
 
         if not row:
             return None
 
         return StateSnapshot(
-            id=row["id"],
-            total_equity=row["total_equity"],
-            available_capital=row["available_capital"],
-            allocated_capital=row["allocated_capital"],
-            total_unrealized_pnl=row["total_unrealized_pnl"],
-            total_realized_pnl=row["total_realized_pnl"],
-            num_open_positions=row["num_open_positions"],
-            num_strategies_active=row["num_strategies_active"],
-            timestamp=row["timestamp"],
-            created_at=row["created_at"],
+            id=row.id,
+            total_equity=row.total_equity,
+            available_capital=row.available_capital,
+            allocated_capital=row.allocated_capital,
+            total_unrealized_pnl=row.total_unrealized_pnl,
+            total_realized_pnl=row.total_realized_pnl,
+            num_open_positions=row.num_open_positions,
+            num_strategies_active=row.num_strategies_active,
+            timestamp=row.timestamp,
+            created_at=row.created_at,
         )
 
     # ========================================================================
@@ -667,22 +719,19 @@ class StateManager:
             severity: Event severity ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
         """
         now = int(datetime.now().timestamp() * 1000)
+        engine = self._get_engine()
 
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            INSERT INTO event_log (event_type, event_data, severity, timestamp, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                event_type,
-                json.dumps(event_data) if event_data else None,
-                severity,
-                now,
-                now,
-            ),
-        )
-
-        conn.commit()
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO event_log (event_type, event_data, severity, timestamp, created_at)
+                    VALUES (:event_type, :event_data, :severity, :timestamp, :created_at)
+                """),
+                {
+                    "event_type": event_type,
+                    "event_data": json.dumps(event_data) if event_data else None,
+                    "severity": severity,
+                    "timestamp": now,
+                    "created_at": now,
+                },
+            )
