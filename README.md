@@ -57,6 +57,44 @@ pytest tests/unit/ -v
 pytest tests/unit/ --cov=. --cov-report=term-missing
 ```
 
+### 🐳 Docker Quick Start (Recommended for Paper Trading)
+
+Run strategies in production-ready Docker containers with PostgreSQL:
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your Kirby API credentials
+
+# 2. Start all services
+docker compose up -d
+
+# 3. View logs
+docker logs nailsage-binance -f
+
+# 4. Check status
+docker compose ps
+
+# 5. Stop services
+docker compose down
+```
+
+**What's running:**
+- PostgreSQL database (port 5433)
+- FastAPI dashboard API (port 8001)
+- Strategy containers (Binance, Hyperliquid)
+
+**Development workflow:**
+```bash
+# Make code changes, then rebuild
+docker compose build nailsage-binance && docker compose up -d nailsage-binance
+
+# View live predictions
+docker logs nailsage-binance --tail 100 -f
+```
+
+**Full documentation:** See [docs/DOCKER.md](docs/DOCKER.md) for complete setup, deployment, and troubleshooting guides.
+
 ## 📁 Project Structure
 
 ```
