@@ -140,7 +140,8 @@ class ModelPredictor:
             raise ValueError(f"Model {self.model_id} not found in registry")
 
         # Check if artifact file exists
-        artifact_path = Path(self.metadata.model_artifact_path)
+        # Normalize path separators for cross-platform compatibility (Windows -> Linux)
+        artifact_path = Path(self.metadata.model_artifact_path.replace('\\', '/'))
         if not artifact_path.exists():
             raise FileNotFoundError(
                 f"Model artifact not found: {artifact_path}"

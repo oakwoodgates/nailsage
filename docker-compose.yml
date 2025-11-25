@@ -1,0 +1,185 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: nailsage-postgres
+    environment:
+      POSTGRES_DB: nailsage
+      POSTGRES_USER: nailsage
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./execution/persistence/schema.postgres.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ports:
+      - "5433:5432"  # Use 5433 locally to avoid conflict with Kirby database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nailsage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+    networks:
+      - nailsage-network
+
+  # ============================================================================
+  # API Container (FastAPI - Dashboard Backend)
+  # ============================================================================
+  nailsage-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nailsage-api
+    command: ["python", "-m", "uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+    ports:
+      - "8001:8000"  # Use 8001 locally to avoid conflict with Kirby API
+    environment:
+      DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
+      POLL_INTERVAL: ${POLL_INTERVAL:-2}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - nailsage-network
+
+  # ============================================================================
+  # Binance Strategies Container
+  # ============================================================================
+  nailsage-binance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nailsage-binance
+    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    environment:
+      # Database
+      DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
+
+      # Exchange configuration
+      EXCHANGE: binance
+
+      # Strategy configuration (comma-separated list)
+      STRATEGY_IDS: ${BINANCE_STRATEGY_IDS:-btc_momentum_v1,sol_swing_v1}
+
+      # Starlisting IDs (comma-separated)
+      STARLISTING_IDS: ${BINANCE_STARLISTING_IDS:-1,2}
+
+      # Kirby WebSocket (both dev and prod for config compatibility)
+      KIRBY_WS_URL: ${KIRBY_WS_URL_PRO}
+      KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
+      KIRBY_WS_URL_DEV: ${KIRBY_WS_URL_DEV}
+      KIRBY_API_KEY_DEV: ${KIRBY_API_KEY_DEV}
+      KIRBY_WS_URL_PRO: ${KIRBY_WS_URL_PRO}
+      KIRBY_API_KEY_PRO: ${KIRBY_API_KEY_PRO}
+
+      # Starlisting mappings
+      STARLISTING_BTC_USDT_15M: ${STARLISTING_BTC_USDT_15M:-2}
+      STARLISTING_SOL_USDT_4H: ${STARLISTING_SOL_USDT_4H:-2}
+
+      # Paper trading settings
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Environment mode (explicitly set to prod for Docker)
+      MODE: prod
+    volumes:
+      - ./models/trained:/app/models/trained
+      - ./models/metadata:/app/models/metadata
+      - ./data/raw:/app/data/raw
+      - ./logs:/app/logs
+      - ./features/cache:/app/features/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py", "--container-type", "strategy"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - nailsage-network
+
+  # ============================================================================
+  # Hyperliquid Strategies Container
+  # ============================================================================
+  nailsage-hyperliquid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nailsage-hyperliquid
+    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    environment:
+      # Database
+      DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
+
+      # Exchange configuration
+      EXCHANGE: hyperliquid
+
+      # Strategy configuration (comma-separated list)
+      STRATEGY_IDS: ${HYPERLIQUID_STRATEGY_IDS:-}
+
+      # Starlisting IDs (comma-separated)
+      STARLISTING_IDS: ${HYPERLIQUID_STARLISTING_IDS:-}
+
+      # Kirby WebSocket
+      KIRBY_WS_URL: ${KIRBY_WS_URL_PRO}
+      KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
+
+      # Paper trading settings
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Environment mode (explicitly set to prod for Docker)
+      MODE: prod
+    volumes:
+      - ./models/trained:/app/models/trained
+      - ./models/metadata:/app/models/metadata
+      - ./data/raw:/app/data/raw
+      - ./logs:/app/logs
+      - ./features/cache:/app/features/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py", "--container-type", "strategy"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - nailsage-network
+    profiles:
+      - hyperliquid  # Only start if explicitly enabled
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  nailsage-network:
+    driver: bridge
+    name: nailsage-network
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  postgres-data:
+    name: nailsage-postgres-data
