@@ -31,6 +31,7 @@ COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     libpq5 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security

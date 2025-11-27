@@ -65,7 +65,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-binance
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
@@ -92,7 +92,7 @@ services:
       STARLISTING_SOL_USDT_4H: ${STARLISTING_SOL_USDT_4H:-2}
 
       # Paper trading settings
-      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-10000.0}
       PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       # Environment mode (explicitly set to prod for Docker)
@@ -124,7 +124,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-hyperliquid
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
@@ -143,7 +143,7 @@ services:
       KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
 
       # Paper trading settings
-      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-10000.0}
       PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       # Environment mode (explicitly set to prod for Docker)
