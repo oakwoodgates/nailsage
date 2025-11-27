@@ -62,8 +62,26 @@ class Prediction:
     probabilities: Dict[str, float]
 
     def get_signal(self) -> str:
-        """Get signal as string (SHORT, NEUTRAL, LONG)."""
-        return ["SHORT", "NEUTRAL", "LONG"][self.prediction]
+        """Get signal as string (SHORT, NEUTRAL, LONG).
+
+        For binary classification:
+        - prediction=0 → SHORT
+        - prediction=1 → LONG
+
+        For 3-class classification:
+        - prediction=0 → SHORT
+        - prediction=1 → NEUTRAL
+        - prediction=2 → LONG
+        """
+        # Detect binary model by checking if neutral probability is 0.0
+        is_binary = self.probabilities.get('neutral', 0.0) == 0.0
+
+        if is_binary:
+            # Binary: 0=SHORT, 1=LONG
+            return ["SHORT", "LONG"][self.prediction]
+        else:
+            # 3-class: 0=SHORT, 1=NEUTRAL, 2=LONG
+            return ["SHORT", "NEUTRAL", "LONG"][self.prediction]
 
     def __repr__(self) -> str:
         return (
@@ -281,6 +299,23 @@ class ModelPredictor:
         predicted_class = int(np.argmax(class_probs))
         confidence = float(np.max(class_probs))
 
+        # Build probabilities dict based on number of classes
+        num_classes = len(class_probs)
+        if num_classes == 2:
+            # Binary classification: 0=short, 1=long
+            probs_dict = {
+                'short': float(class_probs[0]),
+                'neutral': 0.0,  # No neutral in binary
+                'long': float(class_probs[1]),
+            }
+        else:
+            # 3-class classification: 0=short, 1=neutral, 2=long
+            probs_dict = {
+                'short': float(class_probs[0]),
+                'neutral': float(class_probs[1]),
+                'long': float(class_probs[2]),
+            }
+
         # Create prediction object
         prediction = Prediction(
             timestamp=current_timestamp,
@@ -288,11 +323,7 @@ class ModelPredictor:
             model_id=self.model_id,
             prediction=predicted_class,
             confidence=confidence,
-            probabilities={
-                'short': float(class_probs[0]),
-                'neutral': float(class_probs[1]),
-                'long': float(class_probs[2]),
-            }
+            probabilities=probs_dict
         )
 
         # Cache prediction

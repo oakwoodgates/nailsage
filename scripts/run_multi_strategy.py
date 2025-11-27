@@ -205,6 +205,8 @@ class MultiStrategyEngine:
 
         # Load feature config
         feature_config = FeatureConfig.model_validate(model_metadata.feature_config)
+        # Disable cache for live trading (streaming data doesn't benefit from caching)
+        feature_config.enable_cache = False
         feature_engine = FeatureEngine(feature_config)
 
         # Initialize predictor
@@ -266,6 +268,7 @@ class MultiStrategyEngine:
             enable_trading=True,
         )
 
+        # Phase 1.3: Use LiveStrategy with testable components
         strategy = LiveStrategy(
             config=strategy_config,
             predictor=predictor,
@@ -274,6 +277,7 @@ class MultiStrategyEngine:
             position_tracker=self.position_tracker,
             state_manager=self.state_manager,
         )
+        # TODO: Phase 1.2 - Integrate RiskManager for pre-trade validation
 
         await strategy.start()
         self.strategies[starlisting_id] = strategy

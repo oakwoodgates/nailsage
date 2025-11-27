@@ -118,6 +118,7 @@ class SignalGenerator:
         self,
         prediction: Prediction,
         candle_interval_ms: int = 900000,  # 15 minutes default
+        has_open_positions: bool = False,
     ) -> Optional[StrategySignal]:
         """
         Generate a trading signal from a prediction.
@@ -125,6 +126,7 @@ class SignalGenerator:
         Args:
             prediction: Prediction from ModelPredictor
             candle_interval_ms: Interval between candles in milliseconds
+            has_open_positions: True if there are currently open positions
 
         Returns:
             StrategySignal if conditions met, None otherwise
@@ -132,6 +134,7 @@ class SignalGenerator:
         Conditions for generating signal:
         1. Confidence meets threshold
         2. Signal is different from last signal (deduplication)
+           - UNLESS we have open positions and signal is NEUTRAL (must close positions!)
         3. Cooldown period has elapsed since last signal
         4. If neutral signal, check allow_neutral_signals config
         """
@@ -140,23 +143,34 @@ class SignalGenerator:
 
         # Check if neutral signals are allowed
         if signal_direction == 0 and not self.config.allow_neutral_signals:
-            logger.debug("Neutral signal suppressed (allow_neutral_signals=False)")
+            logger.info("❌ Signal suppressed: Neutral signal not allowed")
             return None
 
         # Check confidence threshold
         if prediction.confidence < self.config.confidence_threshold:
-            logger.debug(
-                f"Prediction confidence {prediction.confidence:.2%} "
-                f"below threshold {self.config.confidence_threshold:.2%}"
+            logger.info(
+                f"❌ Signal suppressed: Confidence {prediction.confidence:.2%} "
+                f"< threshold {self.config.confidence_threshold:.2%}"
             )
             return None
 
         # Check deduplication (same signal as last)
-        if self._last_signal is not None and signal_direction == self._last_signal:
-            logger.debug(
-                f"Signal {signal_direction} is duplicate of last signal, skipping"
+        # EXCEPTION: If we have open positions and signal is NEUTRAL, we MUST emit it to close positions
+        is_duplicate = self._last_signal is not None and signal_direction == self._last_signal
+        is_closing_signal = has_open_positions and signal_direction == 0
+
+        if is_duplicate and not is_closing_signal:
+            signal_name = {-1: "SHORT", 0: "NEUTRAL", 1: "LONG"}[signal_direction]
+            logger.info(
+                f"❌ Signal suppressed: {signal_name} is duplicate of last signal"
             )
             return None
+
+        # Log if we're emitting a duplicate NEUTRAL to close positions
+        if is_duplicate and is_closing_signal:
+            logger.info(
+                f"Emitting duplicate NEUTRAL signal to close {has_open_positions} open position(s)"
+            )
 
         # Check cooldown period
         if not self._is_cooldown_elapsed(prediction.timestamp, candle_interval_ms):
@@ -164,9 +178,9 @@ class SignalGenerator:
                 prediction.timestamp,
                 candle_interval_ms
             )
-            logger.debug(
-                f"Cooldown period not elapsed "
-                f"({bars_since_last}/{self.config.cooldown_bars} bars)"
+            logger.info(
+                f"❌ Signal suppressed: Cooldown period "
+                f"({bars_since_last}/{self.config.cooldown_bars} bars elapsed)"
             )
             return None
 
@@ -186,7 +200,7 @@ class SignalGenerator:
         self._signals_generated += 1
 
         logger.info(
-            f"Generated signal #{self._signals_generated}: "
+            f"✅ Generated signal #{self._signals_generated}: "
             f"{signal.direction_name.upper()} "
             f"(confidence: {signal.confidence:.2%})",
             extra={
@@ -202,18 +216,31 @@ class SignalGenerator:
         """
         Convert prediction class to signal direction.
 
+        Supports both binary and 3-class classification:
+        - Binary: 0=short, 1=long
+        - 3-class: 0=short, 1=neutral, 2=long
+
         Args:
-            prediction_class: 0=short, 1=neutral, 2=long
+            prediction_class: Prediction class (0, 1, or 2)
 
         Returns:
             Signal direction: -1=short, 0=neutral, 1=long
         """
-        mapping = {
+        # Binary classification (2 classes)
+        if prediction_class in [0, 1]:
+            mapping = {
+                0: -1,  # short
+                1: 1,   # long
+            }
+            return mapping.get(prediction_class, 0)
+
+        # 3-class classification (fallback for legacy models)
+        mapping_3class = {
             0: -1,  # short
             1: 0,   # neutral
             2: 1,   # long
         }
-        return mapping[prediction_class]
+        return mapping_3class.get(prediction_class, 0)
 
     def _is_cooldown_elapsed(
         self,

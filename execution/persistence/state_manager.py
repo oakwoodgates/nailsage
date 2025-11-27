@@ -292,6 +292,7 @@ class StateManager:
                          is_active, created_at, updated_at)
                         VALUES (:strategy_name, :version, :starlisting_id, :interval, :model_id,
                                 :config_path, :is_active, :created_at, :updated_at)
+                        RETURNING id
                     """),
                     {
                         "strategy_name": strategy.strategy_name,
@@ -305,7 +306,7 @@ class StateManager:
                         "updated_at": now,
                     },
                 )
-                strategy_id = result.lastrowid
+                strategy_id = result.fetchone()[0]
                 logger.info(f"Saved new strategy: {strategy.strategy_name} v{strategy.version} (ID: {strategy_id})")
             else:
                 # Update existing strategy
@@ -345,7 +346,7 @@ class StateManager:
 
         with engine.connect() as conn:
             result = conn.execute(text("SELECT * FROM strategies WHERE is_active = TRUE"))
-            rows = result.fetchall()
+            rows = result.mappings().fetchall()
 
         return [self._row_to_strategy(row) for row in rows]
 
@@ -358,23 +359,23 @@ class StateManager:
                 text("SELECT * FROM strategies WHERE id = :id"),
                 {"id": strategy_id}
             )
-            row = result.fetchone()
+            row = result.mappings().fetchone()
 
         return self._row_to_strategy(row) if row else None
 
     def _row_to_strategy(self, row) -> Strategy:
         """Convert database row to Strategy object."""
         return Strategy(
-            id=row.id if hasattr(row, 'id') else row[0],
-            strategy_name=row.strategy_name if hasattr(row, 'strategy_name') else row[1],
-            version=row.version if hasattr(row, 'version') else row[2],
-            starlisting_id=row.starlisting_id if hasattr(row, 'starlisting_id') else row[3],
-            interval=row.interval if hasattr(row, 'interval') else row[4],
-            model_id=row.model_id if hasattr(row, 'model_id') else row[5],
-            config_path=row.config_path if hasattr(row, 'config_path') else row[6],
-            is_active=bool(row.is_active if hasattr(row, 'is_active') else row[7]),
-            created_at=row.created_at if hasattr(row, 'created_at') else row[8],
-            updated_at=row.updated_at if hasattr(row, 'updated_at') else row[9],
+            id=row["id"],
+            strategy_name=row["strategy_name"],
+            version=row["version"],
+            starlisting_id=row["starlisting_id"],
+            interval=row["interval"],
+            model_id=row["model_id"],
+            config_path=row["config_path"],
+            is_active=bool(row["is_active"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     # ========================================================================
@@ -406,6 +407,7 @@ class StateManager:
                         VALUES (:strategy_id, :starlisting_id, :side, :size, :entry_price, :entry_timestamp,
                                 :exit_price, :exit_timestamp, :realized_pnl, :unrealized_pnl, :fees_paid,
                                 :status, :stop_loss_price, :take_profit_price, :exit_reason, :created_at, :updated_at)
+                        RETURNING id
                     """),
                     {
                         "strategy_id": position.strategy_id,
@@ -427,7 +429,7 @@ class StateManager:
                         "updated_at": now,
                     },
                 )
-                position_id = result.lastrowid
+                position_id = result.fetchone()[0]
                 logger.info(
                     f"Saved new position: {position.side} {position.size:.2f} @ {position.entry_price:.2f} "
                     f"(ID: {position_id})"
@@ -490,7 +492,7 @@ class StateManager:
             else:
                 result = conn.execute(text("SELECT * FROM positions WHERE status = 'open'"))
 
-            rows = result.fetchall()
+            rows = result.mappings().fetchall()
 
         return [self._row_to_position(row) for row in rows]
 
@@ -503,7 +505,7 @@ class StateManager:
                 text("SELECT * FROM positions WHERE id = :position_id"),
                 {"position_id": position_id}
             )
-            row = result.fetchone()
+            row = result.mappings().fetchone()
 
         return self._row_to_position(row) if row else None
 
@@ -682,22 +684,22 @@ class StateManager:
             result = conn.execute(
                 text("SELECT * FROM state_snapshots ORDER BY timestamp DESC LIMIT 1")
             )
-            row = result.fetchone()
+            row = result.mappings().fetchone()
 
         if not row:
             return None
 
         return StateSnapshot(
-            id=row.id,
-            total_equity=row.total_equity,
-            available_capital=row.available_capital,
-            allocated_capital=row.allocated_capital,
-            total_unrealized_pnl=row.total_unrealized_pnl,
-            total_realized_pnl=row.total_realized_pnl,
-            num_open_positions=row.num_open_positions,
-            num_strategies_active=row.num_strategies_active,
-            timestamp=row.timestamp,
-            created_at=row.created_at,
+            id=row["id"],
+            total_equity=row["total_equity"],
+            available_capital=row["available_capital"],
+            allocated_capital=row["allocated_capital"],
+            total_unrealized_pnl=row["total_unrealized_pnl"],
+            total_realized_pnl=row["total_realized_pnl"],
+            num_open_positions=row["num_open_positions"],
+            num_strategies_active=row["num_strategies_active"],
+            timestamp=row["timestamp"],
+            created_at=row["created_at"],
         )
 
     # ========================================================================
