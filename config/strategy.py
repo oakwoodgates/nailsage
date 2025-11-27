@@ -72,10 +72,10 @@ class ModelSection(BaseConfig):
 class ValidationSection(BaseConfig):
     """Validation section of strategy config."""
 
-    method: str = Field(default="walk_forward", description="Validation method")
-    n_splits: int = Field(default=4, description="Number of splits", ge=2)
-    expanding_window: bool = Field(default=True, description="Use expanding window")
-    gap_bars: int = Field(default=0, description="Gap bars between splits", ge=0)
+    method: str = Field(default="walk_forward", description="Validation method (walk_forward, single_split)")
+    n_splits: int = Field(default=4, description="Number of walk-forward splits", ge=2)
+    expanding_window: bool = Field(default=True, description="Use expanding window (vs sliding)")
+    gap_bars: int = Field(default=0, description="Gap bars between train/val splits", ge=0)
 
 
 class BacktestSection(BaseConfig):
