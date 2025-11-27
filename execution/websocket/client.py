@@ -437,8 +437,12 @@ class KirbyWebSocketClient:
         """
         logger.info(f"Received {msg.count} historical candles for starlisting {msg.starlisting_id}")
 
-        # Iterate through each historical candle
-        for candle in msg.data:
+        # Sort historical candles chronologically (oldest first) to maintain proper order
+        # The server may send them in reverse order (newest first)
+        sorted_candles = sorted(msg.data, key=lambda c: c.timestamp)
+
+        # Iterate through each historical candle in chronological order
+        for candle in sorted_candles:
             # Convert to CandleUpdate for callback compatibility
             candle_update = CandleUpdate(
                 type=MessageType.CANDLE,
