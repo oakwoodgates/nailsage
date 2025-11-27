@@ -5,6 +5,7 @@ Detects when a new candle starts (previous candle closed) by tracking timestamps
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -92,8 +93,10 @@ class CandleCloseDetector:
             return None
 
         # Different timestamp = new candle started = previous candle closed!
+        prev_datetime = datetime.fromtimestamp(self._last_timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        new_datetime = datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S")
         logger.info(
-            f"🕯️  Candle closed! Previous: {self._last_timestamp}, New: {timestamp}"
+            f"🕯️  Candle closed at {prev_datetime} → New candle at {new_datetime}"
         )
 
         event = CandleCloseEvent(
