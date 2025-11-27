@@ -178,6 +178,7 @@ class CandleBuffer:
         Returns:
             DataFrame with columns: timestamp, open, high, low, close, volume, num_trades
             Index is datetime (from timestamp)
+            Data is ALWAYS sorted by timestamp to ensure chronological order
 
         Raises:
             ValueError: If buffer is empty
@@ -192,15 +193,20 @@ class CandleBuffer:
             else:
                 candles = list(self._buffer)[-n:]
 
+            # CRITICAL: Sort by timestamp to ensure chronological order
+            # This is essential for correct technical indicator calculation
+            # even if historical candles arrived out-of-order
+            candles_sorted = sorted(candles, key=lambda c: c.timestamp)
+
             # Convert to DataFrame
             data = {
-                "timestamp": [c.timestamp for c in candles],
-                "open": [c.open for c in candles],
-                "high": [c.high for c in candles],
-                "low": [c.low for c in candles],
-                "close": [c.close for c in candles],
-                "volume": [c.volume for c in candles],
-                "num_trades": [c.num_trades if c.num_trades is not None else 0 for c in candles],
+                "timestamp": [c.timestamp for c in candles_sorted],
+                "open": [c.open for c in candles_sorted],
+                "high": [c.high for c in candles_sorted],
+                "low": [c.low for c in candles_sorted],
+                "close": [c.close for c in candles_sorted],
+                "volume": [c.volume for c in candles_sorted],
+                "num_trades": [c.num_trades if c.num_trades is not None else 0 for c in candles_sorted],
             }
             df = pd.DataFrame(data)
 
