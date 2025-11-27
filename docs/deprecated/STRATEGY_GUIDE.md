@@ -1,6 +1,16 @@
 # Strategy Implementation Guide
 
-Complete guide for implementing your first ML trading strategy in NailSage.
+> **⚠️ DEPRECATED**: This guide uses the old strategy-specific training approach. For the new generic, configuration-driven training architecture, see [MODEL_TRAINING.md](MODEL_TRAINING.md).
+>
+> **What changed**: We've moved from strategy-specific scripts (`strategies/short_term/train_*.py`) to generic scripts (`scripts/train_model.py`, `scripts/validate_model.py`, `scripts/run_backtest.py`) that work with any strategy configuration.
+>
+> **Why**: This architecture scales better to 100s of models - 1 bug fix benefits all strategies, no code duplication, and configuration-driven behavior.
+>
+> **Migration**: See [MODEL_TRAINING.md](MODEL_TRAINING.md) for the new workflow.
+
+---
+
+Complete guide for implementing your first ML trading strategy in NailSage (LEGACY APPROACH).
 
 ## 📋 Prerequisites
 
