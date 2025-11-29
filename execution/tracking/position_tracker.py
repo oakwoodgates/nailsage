@@ -426,15 +426,33 @@ class PositionTracker:
                 return True
         return False
 
-    def get_stats(self) -> dict:
+    def get_stats(self, strategy_id: Optional[int] = None) -> dict:
         """
         Get statistics about tracked positions.
 
+        Args:
+            strategy_id: Optional strategy ID to filter stats
+
         Returns:
-            Dict with statistics
+            Dict with statistics including P&L and win rate
         """
+        # Get realized P&L and closed position stats from database
+        total_realized_pnl = self.state_manager.get_total_realized_pnl(strategy_id)
+        closed_stats = self.state_manager.get_closed_positions_stats(strategy_id)
+
+        # Calculate win rate
+        total_closed = closed_stats['total_closed']
+        num_wins = closed_stats['num_wins']
+        num_losses = closed_stats['num_losses']
+        win_rate = (num_wins / total_closed * 100) if total_closed > 0 else 0.0
+
         return {
             "num_open_positions": len(self._open_positions),
             "total_unrealized_pnl": self.get_total_unrealized_pnl(),
             "total_exposure_usd": self.get_total_exposure_usd(),
+            "total_realized_pnl": total_realized_pnl,
+            "num_wins": num_wins,
+            "num_losses": num_losses,
+            "total_closed": total_closed,
+            "win_rate": win_rate,
         }

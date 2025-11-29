@@ -532,6 +532,82 @@ class StateManager:
             updated_at=row["updated_at"],
         )
 
+    def get_total_realized_pnl(self, strategy_id: Optional[int] = None) -> float:
+        """
+        Get sum of realized P&L from all closed positions.
+
+        Args:
+            strategy_id: Filter by strategy ID (None = all strategies)
+
+        Returns:
+            Total realized P&L (USDT)
+        """
+        engine = self._get_engine()
+
+        with engine.connect() as conn:
+            if strategy_id is not None:
+                result = conn.execute(
+                    text("""
+                        SELECT COALESCE(SUM(realized_pnl), 0)
+                        FROM positions
+                        WHERE status = 'closed' AND strategy_id = :strategy_id
+                    """),
+                    {"strategy_id": strategy_id}
+                )
+            else:
+                result = conn.execute(
+                    text("SELECT COALESCE(SUM(realized_pnl), 0) FROM positions WHERE status = 'closed'")
+                )
+
+            return float(result.scalar())
+
+    def get_closed_positions_stats(self, strategy_id: Optional[int] = None) -> Dict[str, int]:
+        """
+        Get win/loss statistics for closed positions.
+
+        Args:
+            strategy_id: Filter by strategy ID (None = all strategies)
+
+        Returns:
+            Dictionary with keys:
+                - num_wins: Number of winning trades (realized_pnl > 0)
+                - num_losses: Number of losing trades (realized_pnl <= 0)
+                - total_closed: Total number of closed positions
+        """
+        engine = self._get_engine()
+
+        with engine.connect() as conn:
+            if strategy_id is not None:
+                result = conn.execute(
+                    text("""
+                        SELECT
+                            COUNT(*) FILTER (WHERE realized_pnl > 0) as num_wins,
+                            COUNT(*) FILTER (WHERE realized_pnl <= 0) as num_losses,
+                            COUNT(*) as total_closed
+                        FROM positions
+                        WHERE status = 'closed' AND strategy_id = :strategy_id
+                    """),
+                    {"strategy_id": strategy_id}
+                )
+            else:
+                result = conn.execute(
+                    text("""
+                        SELECT
+                            COUNT(*) FILTER (WHERE realized_pnl > 0) as num_wins,
+                            COUNT(*) FILTER (WHERE realized_pnl <= 0) as num_losses,
+                            COUNT(*) as total_closed
+                        FROM positions
+                        WHERE status = 'closed'
+                    """)
+                )
+
+            row = result.fetchone()
+            return {
+                "num_wins": int(row[0] or 0),
+                "num_losses": int(row[1] or 0),
+                "total_closed": int(row[2] or 0),
+            }
+
     # ========================================================================
     # Trade Methods
     # ========================================================================

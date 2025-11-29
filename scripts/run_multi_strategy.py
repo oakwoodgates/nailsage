@@ -336,7 +336,7 @@ class MultiStrategyEngine:
             await self.shutdown()
 
     def _log_status(self):
-        """Log current status."""
+        """Log current status with enhanced P&L and position details."""
         if not self.strategies:
             return
 
@@ -346,12 +346,48 @@ class MultiStrategyEngine:
 
         for starlisting_id, strategy in self.strategies.items():
             stats = strategy.get_stats()
+            pos_stats = stats['position_stats']
+
+            # Basic stats
             logger.info(f"Strategy: {stats['strategy_name']}")
-            logger.info(f"  Candles processed: {stats['candles_processed']}")
-            logger.info(f"  Signals generated: {stats['signals_generated']}")
-            logger.info(f"  Trades executed: {stats['trades_executed']}")
-            logger.info(f"  Open positions: {stats['position_stats']['num_open_positions']}")
-            logger.info(f"  Unrealized P&L: ${stats['position_stats']['total_unrealized_pnl']:,.2f}")
+            logger.info(
+                f"  Candles: {stats['candles_processed']} | "
+                f"Signals: {stats['signals_generated']} | "
+                f"Trades: {stats['trades_executed']}"
+            )
+
+            # Performance stats
+            total_pnl = pos_stats['total_unrealized_pnl'] + pos_stats['total_realized_pnl']
+            logger.info("")
+            logger.info("  Performance:")
+            logger.info(
+                f"    Total P&L: ${total_pnl:,.2f} "
+                f"(Unrealized: ${pos_stats['total_unrealized_pnl']:,.2f} | "
+                f"Realized: ${pos_stats['total_realized_pnl']:,.2f})"
+            )
+
+            # Win rate
+            win_rate = pos_stats['win_rate']
+            num_wins = pos_stats['num_wins']
+            num_losses = pos_stats['num_losses']
+            logger.info(
+                f"    Win Rate: {win_rate:.1f}% ({num_wins}W / {num_losses}L) | "
+                f"Open Positions: {pos_stats['num_open_positions']}"
+            )
+
+            # Show open position details if any
+            if pos_stats['num_open_positions'] > 0:
+                current_price = stats['current_price']
+                open_positions = stats['open_positions']
+
+                logger.info("")
+                logger.info("  Open Position Details:")
+                for position in open_positions:
+                    logger.info(
+                        f"    Position #{position.id} [{position.side.upper()}]: "
+                        f"Entry ${position.entry_price:,.2f} → Current ${current_price:,.2f} | "
+                        f"P&L: ${position.unrealized_pnl:,.2f}"
+                    )
 
         logger.info("-" * 70 + "\n")
 

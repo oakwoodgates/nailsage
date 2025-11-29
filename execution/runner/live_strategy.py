@@ -105,6 +105,7 @@ class LiveStrategy:
         self._candles_processed = 0
         self._signals_generated = 0
         self._trades_executed = 0
+        self._current_price = 0.0  # Latest candle close price
 
         logger.info(
             f"Initialized LiveStrategy: {config.strategy_name}",
@@ -157,6 +158,9 @@ class LiveStrategy:
         candle = candle_update.data
         timestamp = candle.timestamp
         price = candle.close
+
+        # Store current price for status reporting
+        self._current_price = price
 
         # Detect candle close
         try:
@@ -247,10 +251,13 @@ class LiveStrategy:
         Get strategy statistics.
 
         Returns:
-            Dict with candles processed, signals generated, trades executed
+            Dict with candles processed, signals generated, trades executed, P&L, and win rate
         """
-        # Get position stats from position tracker
-        position_stats = self.pipeline.position_tracker.get_stats()
+        # Get position stats from position tracker (filtered by strategy_id)
+        position_stats = self.pipeline.position_tracker.get_stats(strategy_id=self.config.strategy_id)
+
+        # Get open positions for this strategy
+        open_positions = self.pipeline.position_tracker.get_open_positions(strategy_id=self.config.strategy_id)
 
         return {
             "strategy_name": self.config.strategy_name,
@@ -259,7 +266,9 @@ class LiveStrategy:
             "trades_executed": self._trades_executed,
             "is_running": self._is_running,
             "candles_seen": self.candle_detector.get_candles_seen(),
+            "current_price": self._current_price,
             "position_stats": position_stats,
+            "open_positions": open_positions,
         }
 
     def __repr__(self) -> str:
