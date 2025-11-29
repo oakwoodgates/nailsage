@@ -149,6 +149,7 @@ nailsage/
 ├── strategies/                # Legacy strategy-specific code (⚠️ DEPRECATED)
 └── docs/
     ├── ACTIVE_FILES.md        # This file (✅ ACTIVE)
+    ├── DATABASE.md            # Database schema and usage (✅ ACTIVE)
     ├── DECISIONS.md           # Architectural Decision Records (✅ ACTIVE)
     ├── DOCKER.md              # Docker guide (✅ ACTIVE)
     ├── MODEL_TRAINING.md      # Training guide (✅ ACTIVE)

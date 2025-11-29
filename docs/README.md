@@ -22,6 +22,7 @@
 
 ### Architecture & Decisions
 - [DECISIONS.md](DECISIONS.md) - Architectural Decision Records (ADRs) documenting key design choices
+- [DATABASE.md](DATABASE.md) - Database schema, tables, views, and usage examples
 
 ---
 
