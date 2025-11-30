@@ -444,6 +444,7 @@ class KirbyWebSocketClient:
         # Iterate through each historical candle in chronological order
         for candle in sorted_candles:
             # Convert to CandleUpdate for callback compatibility
+            # Mark as historical so live strategies don't process it through candle detector
             candle_update = CandleUpdate(
                 type=MessageType.CANDLE,
                 starlisting_id=msg.starlisting_id,
@@ -454,6 +455,7 @@ class KirbyWebSocketClient:
                 market_type=msg.market_type,
                 interval=msg.interval,
                 data=candle,
+                is_historical=True,  # Historical candle
             )
             await self._handle_candle_update(candle_update)
 

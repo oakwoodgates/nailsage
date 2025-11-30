@@ -265,6 +265,7 @@ class CandleUpdate(BaseModel):
     market_type: str = Field(..., description="Market type (spot/perps)")
     interval: str = Field(..., description="Timeframe")
     data: Candle = Field(..., description="Candle data")
+    is_historical: bool = Field(default=False, description="True if this is historical data")
 
     @property
     def candle(self) -> Candle:

@@ -159,31 +159,46 @@ class LiveStrategy:
         timestamp = candle.timestamp
         price = candle.close
 
-        # Store current price for status reporting
-        self._current_price = price
+        # Store current price for status reporting (but only from live candles)
+        if not candle_update.is_historical:
+            self._current_price = price
 
-        # Detect candle close
-        try:
-            close_event = self.candle_detector.process_candle(timestamp)
-        except ValueError as e:
-            logger.error(f"Candle detection error: {e}")
+        # Determine if we should process this candle through the trading pipeline
+        should_process = False
+
+        if candle_update.is_historical:
+            # Historical candles are already closed - process them directly
+            # without candle close detection (which expects monotonic timestamps)
+            should_process = True
+            logger.debug(f"Processing historical candle (timestamp {timestamp})")
+        else:
+            # Live candles - use candle close detector
+            try:
+                close_event = self.candle_detector.process_candle(timestamp)
+            except ValueError as e:
+                logger.error(f"Candle detection error: {e}")
+                return
+
+            # If candle still forming (no close event), just update P&L
+            if close_event is None:
+                logger.debug(f"Candle still forming (timestamp {timestamp}), updating P&L only")
+                await self._update_positions_pnl(price)
+                return
+
+            # Candle closed - process it
+            should_process = True
+            logger.info(
+                f"Processing closed candle for {self.config.strategy_name}",
+                extra={
+                    "timestamp": timestamp,
+                    "price": f"${price:,.2f}",
+                    "is_first": close_event.is_first_candle,
+                }
+            )
+
+        # Process candle through trading pipeline
+        if not should_process:
             return
-
-        # If candle still forming (no close event), just update P&L
-        if close_event is None:
-            logger.debug(f"Candle still forming (timestamp {timestamp}), updating P&L only")
-            await self._update_positions_pnl(price)
-            return
-
-        # Candle closed - run trading pipeline
-        logger.info(
-            f"Processing closed candle for {self.config.strategy_name}",
-            extra={
-                "timestamp": timestamp,
-                "price": f"${price:,.2f}",
-                "is_first": close_event.is_first_candle,
-            }
-        )
 
         try:
             # Get candle data
