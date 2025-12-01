@@ -1,0 +1,151 @@
+"""Strategy endpoints."""
+
+import logging
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from api.dependencies import get_strategy_service, get_trade_service, get_position_service
+from api.services.strategy_service import StrategyService
+from api.services.trade_service import TradeService
+from api.services.position_service import PositionService
+from api.schemas.strategies import StrategyResponse, StrategyWithStats, StrategyListResponse
+from api.schemas.trades import TradeListResponse
+from api.schemas.positions import PositionListResponse
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/strategies", tags=["Strategies"])
+
+
+@router.get("", response_model=StrategyListResponse)
+async def list_strategies(
+    active_only: bool = Query(True, description="Filter to active strategies only"),
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """List all strategies.
+
+    Args:
+        active_only: If True, return only active strategies
+
+    Returns:
+        List of strategies
+    """
+    try:
+        strategies = strategy_service.get_all_strategies(active_only=active_only)
+        return StrategyListResponse(
+            strategies=strategies,
+            total=len(strategies),
+        )
+    except Exception as e:
+        logger.error(f"Error listing strategies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}", response_model=StrategyResponse)
+async def get_strategy(
+    strategy_id: int,
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """Get strategy by ID.
+
+    Args:
+        strategy_id: Strategy ID
+
+    Returns:
+        Strategy details
+    """
+    try:
+        strategy = strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+        return strategy
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}/stats", response_model=StrategyWithStats)
+async def get_strategy_stats(
+    strategy_id: int,
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """Get strategy with performance statistics.
+
+    Args:
+        strategy_id: Strategy ID
+
+    Returns:
+        Strategy with computed statistics
+    """
+    try:
+        strategy = strategy_service.get_strategy_with_stats(strategy_id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+        return strategy
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting strategy stats {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}/trades", response_model=TradeListResponse)
+async def get_strategy_trades(
+    strategy_id: int,
+    limit: int = Query(100, ge=1, le=1000, description="Number of trades to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    trade_service: TradeService = Depends(get_trade_service),
+):
+    """Get trades for a specific strategy.
+
+    Args:
+        strategy_id: Strategy ID
+        limit: Maximum number of trades
+        offset: Pagination offset
+
+    Returns:
+        List of trades for the strategy
+    """
+    try:
+        return trade_service.get_trades(
+            strategy_id=strategy_id,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        logger.error(f"Error getting trades for strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}/positions", response_model=PositionListResponse)
+async def get_strategy_positions(
+    strategy_id: int,
+    status: Optional[str] = Query(None, description="Filter by status (open/closed)"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of positions to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    position_service: PositionService = Depends(get_position_service),
+):
+    """Get positions for a specific strategy.
+
+    Args:
+        strategy_id: Strategy ID
+        status: Filter by status
+        limit: Maximum number of positions
+        offset: Pagination offset
+
+    Returns:
+        List of positions for the strategy
+    """
+    try:
+        return position_service.get_positions(
+            strategy_id=strategy_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        logger.error(f"Error getting positions for strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

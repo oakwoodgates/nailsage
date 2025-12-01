@@ -1,0 +1,368 @@
+"""WebSocket connection manager with subscription support."""
+
+import asyncio
+import json
+import logging
+from typing import Dict, List, Optional, Set
+from uuid import uuid4
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+from api.schemas.websocket import (
+    Channel,
+    SubscribeRequest,
+    UnsubscribeRequest,
+    SubscribeResponse,
+    WebSocketMessage,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ConnectionManager:
+    """
+    Manages WebSocket connections with subscription-based messaging.
+
+    Features:
+    - Channel-based subscriptions (trades, positions, prices, portfolio, signals)
+    - Per-connection subscription tracking
+    - Automatic cleanup on disconnect
+    - Heartbeat support
+    """
+
+    def __init__(self, max_connections: int = 100):
+        """Initialize connection manager.
+
+        Args:
+            max_connections: Maximum allowed concurrent connections
+        """
+        self.max_connections = max_connections
+
+        # Connection tracking: connection_id -> WebSocket
+        self.active_connections: Dict[str, WebSocket] = {}
+
+        # Subscription tracking: channel -> set of connection_ids
+        self.subscriptions: Dict[str, Set[str]] = {
+            "trades": set(),
+            "positions": set(),
+            "portfolio": set(),
+            "prices": set(),
+            "signals": set(),
+        }
+
+        # Reverse mapping: connection_id -> set of channels
+        self.connection_channels: Dict[str, Set[str]] = {}
+
+        # Lock for thread-safe operations
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket) -> Optional[str]:
+        """Accept a new WebSocket connection.
+
+        Args:
+            websocket: WebSocket connection to accept
+
+        Returns:
+            Connection ID if successful, None if at capacity
+        """
+        async with self._lock:
+            if len(self.active_connections) >= self.max_connections:
+                logger.warning(f"Connection rejected: at capacity ({self.max_connections})")
+                await websocket.close(code=1013, reason="Server at capacity")
+                return None
+
+            await websocket.accept()
+
+            connection_id = str(uuid4())
+            self.active_connections[connection_id] = websocket
+            self.connection_channels[connection_id] = set()
+
+            logger.info(
+                f"WebSocket connected: {connection_id} "
+                f"(total: {len(self.active_connections)})"
+            )
+
+            # Send welcome message
+            await websocket.send_json({
+                "type": "connected",
+                "connection_id": connection_id,
+                "message": "Connected to Nailsage API",
+                "available_channels": list(self.subscriptions.keys()),
+            })
+
+            return connection_id
+
+    async def disconnect(self, connection_id: str) -> None:
+        """Handle WebSocket disconnection.
+
+        Args:
+            connection_id: ID of the connection to remove
+        """
+        async with self._lock:
+            if connection_id not in self.active_connections:
+                return
+
+            # Remove from all subscriptions
+            channels = self.connection_channels.get(connection_id, set())
+            for channel in channels:
+                self.subscriptions[channel].discard(connection_id)
+
+            # Clean up connection tracking
+            del self.active_connections[connection_id]
+            if connection_id in self.connection_channels:
+                del self.connection_channels[connection_id]
+
+            logger.info(
+                f"WebSocket disconnected: {connection_id} "
+                f"(total: {len(self.active_connections)})"
+            )
+
+    async def subscribe(
+        self,
+        connection_id: str,
+        channels: List[str],
+    ) -> SubscribeResponse:
+        """Subscribe a connection to channels.
+
+        Args:
+            connection_id: Connection ID
+            channels: List of channels to subscribe to
+
+        Returns:
+            Subscription response
+        """
+        async with self._lock:
+            if connection_id not in self.active_connections:
+                return SubscribeResponse(
+                    action="subscribe",
+                    channels=[],
+                    status="error",
+                    message="Connection not found",
+                )
+
+            subscribed_channels = []
+            for channel in channels:
+                if channel in self.subscriptions:
+                    self.subscriptions[channel].add(connection_id)
+                    self.connection_channels[connection_id].add(channel)
+                    subscribed_channels.append(channel)
+                else:
+                    logger.warning(f"Unknown channel: {channel}")
+
+            logger.debug(
+                f"Connection {connection_id} subscribed to: {subscribed_channels}"
+            )
+
+            return SubscribeResponse(
+                action="subscribe",
+                channels=subscribed_channels,
+                status="subscribed",
+                message=f"Subscribed to {len(subscribed_channels)} channel(s)",
+            )
+
+    async def unsubscribe(
+        self,
+        connection_id: str,
+        channels: List[str],
+    ) -> SubscribeResponse:
+        """Unsubscribe a connection from channels.
+
+        Args:
+            connection_id: Connection ID
+            channels: List of channels to unsubscribe from
+
+        Returns:
+            Unsubscription response
+        """
+        async with self._lock:
+            if connection_id not in self.active_connections:
+                return SubscribeResponse(
+                    action="unsubscribe",
+                    channels=[],
+                    status="error",
+                    message="Connection not found",
+                )
+
+            unsubscribed_channels = []
+            for channel in channels:
+                if channel in self.subscriptions:
+                    self.subscriptions[channel].discard(connection_id)
+                    self.connection_channels[connection_id].discard(channel)
+                    unsubscribed_channels.append(channel)
+
+            logger.debug(
+                f"Connection {connection_id} unsubscribed from: {unsubscribed_channels}"
+            )
+
+            return SubscribeResponse(
+                action="unsubscribe",
+                channels=unsubscribed_channels,
+                status="unsubscribed",
+                message=f"Unsubscribed from {len(unsubscribed_channels)} channel(s)",
+            )
+
+    async def broadcast_to_channel(
+        self,
+        channel: str,
+        message: dict,
+    ) -> int:
+        """Broadcast a message to all subscribers of a channel.
+
+        Args:
+            channel: Channel to broadcast to
+            message: Message to send
+
+        Returns:
+            Number of connections that received the message
+        """
+        if channel not in self.subscriptions:
+            logger.warning(f"Broadcast to unknown channel: {channel}")
+            return 0
+
+        subscribers = self.subscriptions[channel].copy()
+        if not subscribers:
+            return 0
+
+        sent_count = 0
+        disconnected = []
+
+        for conn_id in subscribers:
+            websocket = self.active_connections.get(conn_id)
+            if not websocket:
+                disconnected.append(conn_id)
+                continue
+
+            try:
+                await websocket.send_json(message)
+                sent_count += 1
+            except Exception as e:
+                logger.error(f"Error sending to {conn_id}: {e}")
+                disconnected.append(conn_id)
+
+        # Clean up disconnected clients
+        for conn_id in disconnected:
+            await self.disconnect(conn_id)
+
+        return sent_count
+
+    async def broadcast_to_all(self, message: dict) -> int:
+        """Broadcast a message to all connected clients.
+
+        Args:
+            message: Message to send
+
+        Returns:
+            Number of connections that received the message
+        """
+        if not self.active_connections:
+            return 0
+
+        sent_count = 0
+        disconnected = []
+
+        for conn_id, websocket in self.active_connections.items():
+            try:
+                await websocket.send_json(message)
+                sent_count += 1
+            except Exception as e:
+                logger.error(f"Error sending to {conn_id}: {e}")
+                disconnected.append(conn_id)
+
+        # Clean up disconnected clients
+        for conn_id in disconnected:
+            await self.disconnect(conn_id)
+
+        return sent_count
+
+    async def send_to_connection(
+        self,
+        connection_id: str,
+        message: dict,
+    ) -> bool:
+        """Send a message to a specific connection.
+
+        Args:
+            connection_id: Target connection ID
+            message: Message to send
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        websocket = self.active_connections.get(connection_id)
+        if not websocket:
+            return False
+
+        try:
+            await websocket.send_json(message)
+            return True
+        except Exception as e:
+            logger.error(f"Error sending to {connection_id}: {e}")
+            await self.disconnect(connection_id)
+            return False
+
+    async def handle_message(
+        self,
+        connection_id: str,
+        data: str,
+    ) -> None:
+        """Handle incoming message from a client.
+
+        Args:
+            connection_id: Connection ID
+            data: Raw message data
+        """
+        try:
+            message = json.loads(data)
+            action = message.get("action")
+
+            if action == "subscribe":
+                channels = message.get("channels", [])
+                response = await self.subscribe(connection_id, channels)
+                await self.send_to_connection(connection_id, response.model_dump())
+
+            elif action == "unsubscribe":
+                channels = message.get("channels", [])
+                response = await self.unsubscribe(connection_id, channels)
+                await self.send_to_connection(connection_id, response.model_dump())
+
+            elif action == "ping":
+                await self.send_to_connection(connection_id, {"type": "pong"})
+
+            else:
+                logger.debug(f"Unknown action from {connection_id}: {action}")
+
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid JSON from {connection_id}: {data[:100]}")
+        except Exception as e:
+            logger.error(f"Error handling message from {connection_id}: {e}")
+
+    def get_stats(self) -> dict:
+        """Get connection statistics.
+
+        Returns:
+            Dictionary with connection stats
+        """
+        return {
+            "total_connections": len(self.active_connections),
+            "max_connections": self.max_connections,
+            "subscriptions": {
+                channel: len(subs)
+                for channel, subs in self.subscriptions.items()
+            },
+        }
+
+
+# Global connection manager instance
+_manager: Optional[ConnectionManager] = None
+
+
+def get_connection_manager() -> ConnectionManager:
+    """Get or create the global ConnectionManager instance.
+
+    Returns:
+        ConnectionManager instance
+    """
+    global _manager
+    if _manager is None:
+        _manager = ConnectionManager()
+    return _manager
