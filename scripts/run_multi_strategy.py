@@ -150,14 +150,14 @@ class MultiStrategyEngine:
 
     async def _setup_strategies(self):
         """Set up strategies from environment configuration."""
-        for strategy_id in self.strategy_ids:
+        for idx, strategy_id in enumerate(self.strategy_ids):
             try:
-                await self._setup_single_strategy(strategy_id)
+                await self._setup_single_strategy(strategy_id, idx)
             except Exception as e:
                 logger.error(f"Failed to setup strategy {strategy_id}: {e}", exc_info=True)
                 logger.warning(f"Continuing without strategy {strategy_id}")
 
-    async def _setup_single_strategy(self, strategy_id: str):
+    async def _setup_single_strategy(self, strategy_id: str, strategy_index: int):
         """Set up a single strategy."""
         logger.info(f"\n  Setting up strategy: {strategy_id}")
 
@@ -229,8 +229,16 @@ class MultiStrategyEngine:
         )
         signal_generator = SignalGenerator(signal_gen_config)
 
-        # Determine starlisting ID (first one by default, can be customized per strategy)
-        starlisting_id = self.starlisting_ids[0] if self.starlisting_ids else 1
+        # Map strategy to its corresponding starlisting ID by index
+        # strategy_ids[0] -> starlisting_ids[0], strategy_ids[1] -> starlisting_ids[1], etc.
+        if strategy_index < len(self.starlisting_ids):
+            starlisting_id = self.starlisting_ids[strategy_index]
+        else:
+            # Fallback if starlisting IDs list is shorter than strategies
+            starlisting_id = self.starlisting_ids[0] if self.starlisting_ids else 1
+            logger.warning(f"    No starlisting ID for strategy index {strategy_index}, using {starlisting_id}")
+
+        logger.info(f"    Starlisting ID: {starlisting_id}")
 
         # Register strategy in database
         existing_strategies = self.state_manager.get_active_strategies()

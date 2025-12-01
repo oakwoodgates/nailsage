@@ -154,6 +154,10 @@ def load_and_prepare_data(config: StrategyConfig):
     df = pd.read_parquet(data_path)
     logger.info(f"Loaded {len(df):,} rows")
 
+    # Rename 'time' to 'timestamp' for consistency
+    if 'time' in df.columns and 'timestamp' not in df.columns:
+        df = df.rename(columns={'time': 'timestamp'})
+
     # Resample if needed
     if config.resample_interval:
         logger.info(f"Resampling to {config.resample_interval}")

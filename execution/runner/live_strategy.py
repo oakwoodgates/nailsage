@@ -248,12 +248,14 @@ class LiveStrategy:
 
     async def _update_positions_pnl(self, price: float) -> None:
         """
-        Update P&L for all open positions.
+        Update P&L for this strategy's open positions only.
 
         Args:
             price: Current price
         """
-        positions = self.pipeline.position_tracker.get_open_positions()
+        # CRITICAL: Only update positions for THIS strategy, not all positions!
+        # Otherwise, BTC strategy would update SOL positions with BTC prices.
+        positions = self.pipeline.position_tracker.get_open_positions(strategy_id=self.config.strategy_id)
         for position in positions:
             await asyncio.to_thread(
                 self.pipeline.position_tracker.update_position_pnl,
