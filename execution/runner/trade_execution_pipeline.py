@@ -336,7 +336,7 @@ class TradeExecutionPipeline:
 
         if result.success:
             # Create position record in tracker
-            await asyncio.to_thread(
+            position = await asyncio.to_thread(
                 self.position_tracker.open_position,
                 strategy_id=context.strategy_id,
                 starlisting_id=context.starlisting_id,
@@ -346,6 +346,11 @@ class TradeExecutionPipeline:
                 entry_timestamp=context.timestamp,
                 fees_paid=result.fees_usd,
             )
+
+            # Save trade to database
+            if result.trade:
+                result.trade.position_id = position.id
+                await asyncio.to_thread(self.state_manager.save_trade, result.trade)
 
             logger.info(
                 f"Opened {side} position: "
@@ -381,6 +386,10 @@ class TradeExecutionPipeline:
                 exit_price=result.fill_price,
                 exit_timestamp=context.timestamp,
             )
+
+            # Save trade to database
+            if result.trade:
+                await asyncio.to_thread(self.state_manager.save_trade, result.trade)
 
             logger.info(
                 f"Closed {position.side} position: "
