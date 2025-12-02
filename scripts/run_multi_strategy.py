@@ -150,14 +150,14 @@ class MultiStrategyEngine:
 
     async def _setup_strategies(self):
         """Set up strategies from environment configuration."""
-        for strategy_id in self.strategy_ids:
+        for idx, strategy_id in enumerate(self.strategy_ids):
             try:
-                await self._setup_single_strategy(strategy_id)
+                await self._setup_single_strategy(strategy_id, idx)
             except Exception as e:
                 logger.error(f"Failed to setup strategy {strategy_id}: {e}", exc_info=True)
                 logger.warning(f"Continuing without strategy {strategy_id}")
 
-    async def _setup_single_strategy(self, strategy_id: str):
+    async def _setup_single_strategy(self, strategy_id: str, strategy_index: int):
         """Set up a single strategy."""
         logger.info(f"\n  Setting up strategy: {strategy_id}")
 
@@ -205,6 +205,8 @@ class MultiStrategyEngine:
 
         # Load feature config
         feature_config = FeatureConfig.model_validate(model_metadata.feature_config)
+        # Disable cache for live trading (streaming data doesn't benefit from caching)
+        feature_config.enable_cache = False
         feature_engine = FeatureEngine(feature_config)
 
         # Initialize predictor
@@ -227,8 +229,16 @@ class MultiStrategyEngine:
         )
         signal_generator = SignalGenerator(signal_gen_config)
 
-        # Determine starlisting ID (first one by default, can be customized per strategy)
-        starlisting_id = self.starlisting_ids[0] if self.starlisting_ids else 1
+        # Map strategy to its corresponding starlisting ID by index
+        # strategy_ids[0] -> starlisting_ids[0], strategy_ids[1] -> starlisting_ids[1], etc.
+        if strategy_index < len(self.starlisting_ids):
+            starlisting_id = self.starlisting_ids[strategy_index]
+        else:
+            # Fallback if starlisting IDs list is shorter than strategies
+            starlisting_id = self.starlisting_ids[0] if self.starlisting_ids else 1
+            logger.warning(f"    No starlisting ID for strategy index {strategy_index}, using {starlisting_id}")
+
+        logger.info(f"    Starlisting ID: {starlisting_id}")
 
         # Register strategy in database
         existing_strategies = self.state_manager.get_active_strategies()
@@ -266,6 +276,7 @@ class MultiStrategyEngine:
             enable_trading=True,
         )
 
+        # Phase 1.3: Use LiveStrategy with testable components
         strategy = LiveStrategy(
             config=strategy_config,
             predictor=predictor,
@@ -274,6 +285,7 @@ class MultiStrategyEngine:
             position_tracker=self.position_tracker,
             state_manager=self.state_manager,
         )
+        # TODO: Phase 1.2 - Integrate RiskManager for pre-trade validation
 
         await strategy.start()
         self.strategies[starlisting_id] = strategy
@@ -332,7 +344,7 @@ class MultiStrategyEngine:
             await self.shutdown()
 
     def _log_status(self):
-        """Log current status."""
+        """Log current status with enhanced P&L and position details."""
         if not self.strategies:
             return
 
@@ -342,12 +354,48 @@ class MultiStrategyEngine:
 
         for starlisting_id, strategy in self.strategies.items():
             stats = strategy.get_stats()
+            pos_stats = stats['position_stats']
+
+            # Basic stats
             logger.info(f"Strategy: {stats['strategy_name']}")
-            logger.info(f"  Candles processed: {stats['candles_processed']}")
-            logger.info(f"  Signals generated: {stats['signals_generated']}")
-            logger.info(f"  Trades executed: {stats['trades_executed']}")
-            logger.info(f"  Open positions: {stats['position_stats']['num_open_positions']}")
-            logger.info(f"  Unrealized P&L: ${stats['position_stats']['total_unrealized_pnl']:,.2f}")
+            logger.info(
+                f"  Candles: {stats['candles_processed']} | "
+                f"Signals: {stats['signals_generated']} | "
+                f"Trades: {stats['trades_executed']}"
+            )
+
+            # Performance stats
+            total_pnl = pos_stats['total_unrealized_pnl'] + pos_stats['total_realized_pnl']
+            logger.info("")
+            logger.info("  Performance:")
+            logger.info(
+                f"    Total P&L: ${total_pnl:,.2f} "
+                f"(Unrealized: ${pos_stats['total_unrealized_pnl']:,.2f} | "
+                f"Realized: ${pos_stats['total_realized_pnl']:,.2f})"
+            )
+
+            # Win rate
+            win_rate = pos_stats['win_rate']
+            num_wins = pos_stats['num_wins']
+            num_losses = pos_stats['num_losses']
+            logger.info(
+                f"    Win Rate: {win_rate:.1f}% ({num_wins}W / {num_losses}L) | "
+                f"Open Positions: {pos_stats['num_open_positions']}"
+            )
+
+            # Show open position details if any
+            if pos_stats['num_open_positions'] > 0:
+                current_price = stats['current_price']
+                open_positions = stats['open_positions']
+
+                logger.info("")
+                logger.info("  Open Position Details:")
+                for position in open_positions:
+                    logger.info(
+                        f"    Position #{position.id} [{position.side.upper()}]: "
+                        f"Entry ${position.entry_price:,.2f} → Current ${current_price:,.2f} | "
+                        f"P&L: ${position.unrealized_pnl:,.2f}"
+                    )
 
         logger.info("-" * 70 + "\n")
 

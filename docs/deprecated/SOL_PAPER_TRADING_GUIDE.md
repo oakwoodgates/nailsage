@@ -1,5 +1,9 @@
 # SOL Swing Momentum Paper Trading Guide
 
+> **⚠️ DEPRECATED**: This guide references `run_sol_paper_trading.py` which has been removed. The system now uses [run_multi_strategy.py](../scripts/run_multi_strategy.py) for all paper trading (Docker-based multi-strategy execution).
+>
+> **For Docker deployment**, see [DOCKER.md](DOCKER.md).
+
 ## Overview
 
 This guide covers running the **profitable SOL swing momentum strategy** in paper trading with production settings.

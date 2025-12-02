@@ -4,9 +4,12 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from data.metadata import DatasetMetadata
+
+if TYPE_CHECKING:
+    from models.feature_schema import FeatureSchema
 
 
 def _convert_paths_to_strings(obj: Any) -> Any:
@@ -66,6 +69,7 @@ class ModelMetadata:
     # Optional
     notes: Optional[str] = None
     tags: list[str] = field(default_factory=list)  # For custom categorization
+    feature_schema: Optional[dict[str, Any]] = None  # Feature schema for inference validation (Phase 10)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -87,6 +91,7 @@ class ModelMetadata:
             "created_at": self.created_at,
             "notes": self.notes,
             "tags": self.tags,
+            "feature_schema": self.feature_schema,
         }
         # Recursively convert any Path objects to strings
         return _convert_paths_to_strings(data)

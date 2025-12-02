@@ -18,8 +18,14 @@ NailSage is a production-ready ML trading research platform designed for buildin
 - **✅ Data Leakage Prevention**: Strict temporal ordering with walk-forward validation
 - **✅ Realistic Backtesting**: Transaction costs, slippage, and leverage simulation
 - **✅ Hybrid Model Registry**: Track configuration intent and training history
-- **✅ Dynamic Feature Engineering**: 8 technical indicators computed on-the-fly
+- **✅ Dynamic Feature Engineering**: 18 technical indicators computed on-the-fly
 - **✅ Modular Architecture**: Independent strategies with centralized model management
+- **✅ Binary Classification Models**: Phase 10 aggressive trading with SHORT/LONG signals
+- **✅ Confidence-Based Filtering**: Minimum confidence thresholds for signal generation
+- **✅ Signal Cooldown**: Prevents spam with minimum bars between signals
+- **✅ Real-Time P&L Updates**: Position profitability updated every candle
+- **✅ Transparent Decision Logging**: See why signals are generated or suppressed
+- **✅ Smart Feature Caching**: Enabled for training/backtesting, disabled for live trading
 
 ## 🚀 Quick Start
 
@@ -45,6 +51,19 @@ python scripts/generate_data_metadata.py --file data/raw/your_data.parquet
 
 # For entire directory
 python scripts/generate_data_metadata.py --dir data/raw
+```
+
+### Train and Validate Models
+
+```bash
+# Train with walk-forward validation (saves results to JSON)
+python scripts/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
+
+# Validate existing model
+python scripts/validate_model.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+
+# Quick backtest
+python scripts/run_backtest.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 ```
 
 ### Run Tests
@@ -133,7 +152,10 @@ nailsage/
 ├── tests/                     # Test suite (145 passing tests)
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
-└── scripts/                   # Helper scripts
+└── scripts/                   # Training & utility scripts
+    ├── train_model.py        # Generic training with walk-forward validation
+    ├── validate_model.py     # Standalone model validation
+    ├── run_backtest.py       # Quick backtesting
     ├── generate_data_metadata.py
     ├── test_model_registry.py
     └── verify_imports.py
@@ -199,13 +221,15 @@ assert lookback_window < split_start_timestamp
 
 ## 🎓 Next Steps
 
-**Ready to implement your first strategy?** See [STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) for a complete walkthrough.
+**Ready to train your first model?** See [MODEL_TRAINING.md](docs/MODEL_TRAINING.md) for comprehensive training and validation guide.
 
 **Key Documentation**:
+- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - **NEW**: Training, validation, and backtesting guide
+- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide (legacy)
+- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment guide
 - [.claude/PROJECT_CONTEXT.md](.claude/PROJECT_CONTEXT.md) - Complete project overview
 - [.claude/STATUS.md](.claude/STATUS.md) - Current status and progress
 - [.claude/DECISIONS.md](.claude/DECISIONS.md) - Architectural Decision Records
-- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide
 
 ## 📈 Current Status
 

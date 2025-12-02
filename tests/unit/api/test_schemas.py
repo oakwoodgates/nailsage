@@ -1,0 +1,265 @@
+"""Unit tests for Pydantic schemas."""
+
+import pytest
+from pydantic import ValidationError
+
+from api.schemas.common import PaginationParams, PaginatedResponse, ErrorResponse
+from api.schemas.strategies import StrategyResponse, StrategyWithStats
+from api.schemas.trades import TradeResponse
+from api.schemas.positions import PositionResponse
+from api.schemas.portfolio import PortfolioSummary, AllocationItem
+from api.schemas.stats import FinancialSummary, LeaderboardEntry
+from api.schemas.websocket import SubscribeRequest, WebSocketMessage
+
+
+class TestPaginationParams:
+    """Tests for PaginationParams schema."""
+
+    def test_default_values(self):
+        """Test default pagination values."""
+        params = PaginationParams()
+        assert params.limit == 100
+        assert params.offset == 0
+
+    def test_custom_values(self):
+        """Test custom pagination values."""
+        params = PaginationParams(limit=50, offset=10)
+        assert params.limit == 50
+        assert params.offset == 10
+
+    def test_limit_validation_min(self):
+        """Test limit minimum validation."""
+        with pytest.raises(ValidationError):
+            PaginationParams(limit=0)
+
+    def test_limit_validation_max(self):
+        """Test limit maximum validation."""
+        with pytest.raises(ValidationError):
+            PaginationParams(limit=1001)
+
+    def test_offset_validation(self):
+        """Test offset cannot be negative."""
+        with pytest.raises(ValidationError):
+            PaginationParams(offset=-1)
+
+
+class TestStrategyResponse:
+    """Tests for StrategyResponse schema."""
+
+    def test_valid_strategy(self):
+        """Test valid strategy response."""
+        strategy = StrategyResponse(
+            id=1,
+            strategy_name="test_strategy",
+            version="v1",
+            starlisting_id=123,
+            interval="15m",
+            model_id="model_123",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+        )
+        assert strategy.id == 1
+        assert strategy.strategy_name == "test_strategy"
+        assert strategy.is_active is True
+
+    def test_optional_model_id(self):
+        """Test model_id is optional."""
+        strategy = StrategyResponse(
+            id=1,
+            strategy_name="test",
+            version="v1",
+            starlisting_id=123,
+            interval="1m",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+        )
+        assert strategy.model_id is None
+
+
+class TestStrategyWithStats:
+    """Tests for StrategyWithStats schema."""
+
+    def test_default_stats_values(self):
+        """Test default statistics values."""
+        strategy = StrategyWithStats(
+            id=1,
+            strategy_name="test",
+            version="v1",
+            starlisting_id=123,
+            interval="1m",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+        )
+        assert strategy.total_trades == 0
+        assert strategy.total_pnl_usd == 0.0
+        assert strategy.win_rate == 0.0
+
+    def test_with_stats(self):
+        """Test strategy with populated stats."""
+        strategy = StrategyWithStats(
+            id=1,
+            strategy_name="test",
+            version="v1",
+            starlisting_id=123,
+            interval="1m",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+            total_trades=100,
+            win_count=60,
+            loss_count=40,
+            win_rate=60.0,
+            total_pnl_usd=5000.0,
+            total_pnl_pct=5.0,
+        )
+        assert strategy.total_trades == 100
+        assert strategy.win_rate == 60.0
+
+
+class TestTradeResponse:
+    """Tests for TradeResponse schema."""
+
+    def test_valid_trade(self):
+        """Test valid trade response."""
+        trade = TradeResponse(
+            id=1,
+            position_id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            trade_type="open_long",
+            size=1000.0,
+            price=50000.0,
+            fees=1.0,
+            slippage=0.5,
+            timestamp=1700000000000,
+        )
+        assert trade.id == 1
+        assert trade.trade_type == "open_long"
+        assert trade.size == 1000.0
+
+
+class TestPositionResponse:
+    """Tests for PositionResponse schema."""
+
+    def test_open_position(self):
+        """Test open position response."""
+        position = PositionResponse(
+            id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            side="long",
+            size=1000.0,
+            entry_price=50000.0,
+            entry_timestamp=1700000000000,
+            status="open",
+        )
+        assert position.status == "open"
+        assert position.exit_price is None
+        assert position.realized_pnl is None
+
+    def test_closed_position(self):
+        """Test closed position response."""
+        position = PositionResponse(
+            id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            side="long",
+            size=1000.0,
+            entry_price=50000.0,
+            entry_timestamp=1700000000000,
+            exit_price=51000.0,
+            exit_timestamp=1700001000000,
+            status="closed",
+            realized_pnl=20.0,
+            exit_reason="signal",
+        )
+        assert position.status == "closed"
+        assert position.exit_price == 51000.0
+        assert position.realized_pnl == 20.0
+
+
+class TestPortfolioSummary:
+    """Tests for PortfolioSummary schema."""
+
+    def test_valid_portfolio(self):
+        """Test valid portfolio summary."""
+        portfolio = PortfolioSummary(
+            initial_capital_usd=100000.0,
+            total_equity_usd=105000.0,
+            available_capital_usd=95000.0,
+            allocated_capital_usd=10000.0,
+            total_pnl_usd=5000.0,
+            total_pnl_pct=5.0,
+            realized_pnl_usd=3000.0,
+            unrealized_pnl_usd=2000.0,
+            total_open_positions=5,
+            max_positions=10,
+            position_utilization_pct=50.0,
+            total_exposure_usd=10000.0,
+            long_exposure_usd=7000.0,
+            short_exposure_usd=3000.0,
+            net_exposure_usd=4000.0,
+            active_strategies=3,
+            total_strategies=5,
+            trades_today=10,
+            total_fees_paid=50.0,
+            timestamp=1700000000000,
+        )
+        assert portfolio.total_equity_usd == 105000.0
+        assert portfolio.total_pnl_pct == 5.0
+
+
+class TestFinancialSummary:
+    """Tests for FinancialSummary schema."""
+
+    def test_valid_financial_summary(self):
+        """Test valid financial summary."""
+        summary = FinancialSummary(
+            total_equity_usd=105000.0,
+            total_pnl_usd=5000.0,
+            total_pnl_pct=5.0,
+            realized_pnl_usd=3000.0,
+            unrealized_pnl_usd=2000.0,
+            total_trades=100,
+            total_wins=60,
+            total_losses=40,
+            win_rate=60.0,
+            avg_win_usd=100.0,
+            avg_loss_usd=-50.0,
+            largest_win_usd=500.0,
+            largest_loss_usd=-200.0,
+            profit_factor=2.0,
+            avg_trade_usd=50.0,
+            expectancy_usd=50.0,
+            total_fees_paid=100.0,
+            timestamp=1700000000000,
+        )
+        assert summary.win_rate == 60.0
+        assert summary.profit_factor == 2.0
+
+
+class TestWebSocketSchemas:
+    """Tests for WebSocket schemas."""
+
+    def test_subscribe_request(self):
+        """Test subscribe request."""
+        request = SubscribeRequest(
+            action="subscribe",
+            channels=["trades", "positions"],
+        )
+        assert request.action == "subscribe"
+        assert len(request.channels) == 2
+
+    def test_websocket_message(self):
+        """Test WebSocket message."""
+        message = WebSocketMessage(
+            type="trade.new",
+            channel="trades",
+            timestamp=1700000000000,
+            data={"trade_id": 1, "price": 50000.0},
+        )
+        assert message.type == "trade.new"
+        assert message.channel == "trades"

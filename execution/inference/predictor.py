@@ -36,6 +36,7 @@ import pandas as pd
 from features.engine import FeatureEngine
 from models.registry import ModelRegistry
 from models.metadata import ModelMetadata
+from models.feature_schema import FeatureSchema
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +62,26 @@ class Prediction:
     probabilities: Dict[str, float]
 
     def get_signal(self) -> str:
-        """Get signal as string (SHORT, NEUTRAL, LONG)."""
-        return ["SHORT", "NEUTRAL", "LONG"][self.prediction]
+        """Get signal as string (SHORT, NEUTRAL, LONG).
+
+        For binary classification:
+        - prediction=0 → SHORT
+        - prediction=1 → LONG
+
+        For 3-class classification:
+        - prediction=0 → SHORT
+        - prediction=1 → NEUTRAL
+        - prediction=2 → LONG
+        """
+        # Detect binary model by checking if neutral probability is 0.0
+        is_binary = self.probabilities.get('neutral', 0.0) == 0.0
+
+        if is_binary:
+            # Binary: 0=SHORT, 1=LONG
+            return ["SHORT", "LONG"][self.prediction]
+        else:
+            # 3-class: 0=SHORT, 1=NEUTRAL, 2=LONG
+            return ["SHORT", "NEUTRAL", "LONG"][self.prediction]
 
     def __repr__(self) -> str:
         return (
@@ -109,6 +128,7 @@ class ModelPredictor:
         self.feature_engine = feature_engine
         self.model = None
         self.metadata: Optional[ModelMetadata] = None
+        self.feature_schema: Optional[FeatureSchema] = None
 
         # Caching
         self._last_prediction: Optional[Prediction] = None
@@ -153,6 +173,19 @@ class ModelPredictor:
             joblib.load,
             artifact_path
         )
+
+        # Load feature schema if available (Phase 10 feature)
+        if self.metadata.feature_schema:
+            self.feature_schema = FeatureSchema.from_dict(self.metadata.feature_schema)
+            logger.info(
+                f"Loaded feature schema: {len(self.feature_schema.feature_names)} features, "
+                f"include_ohlcv={self.feature_schema.include_ohlcv}"
+            )
+        else:
+            logger.warning(
+                "No feature schema in metadata - will use legacy feature extraction. "
+                "Consider retraining model with feature schema for better validation."
+            )
 
         logger.info(
             f"Model {self.model_id} loaded successfully",
@@ -212,27 +245,47 @@ class ModelPredictor:
         if len(feature_df) == 0:
             raise ValueError("No features computed - check candle data")
 
-        # Get all columns except timestamp (model expects OHLCV + computed features)
-        # The model was trained on: open, high, low, close, volume + all indicators
-        exclude_cols = ['timestamp']
-        feature_cols = [col for col in feature_df.columns if col not in exclude_cols]
+        # Extract features using schema validation (Phase 10)
+        if self.feature_schema:
+            # Use feature schema for validation and extraction
+            try:
+                self.feature_schema.validate(feature_df)
+                latest_features = self.feature_schema.extract_features(feature_df.iloc[-1:])
 
-        if not feature_cols:
-            raise ValueError("No feature columns computed - check feature engine")
+                # Check for NaN values using schema
+                nan_features = self.feature_schema.check_nan_values(latest_features)
+                if nan_features:
+                    logger.warning(
+                        f"NaN values in features: {nan_features}. "
+                        f"Need more data for indicators."
+                    )
+                    raise ValueError(
+                        f"Insufficient data for feature computation - NaN in: {nan_features}"
+                    )
+            except ValueError as e:
+                logger.error(f"Feature schema validation failed: {e}")
+                raise
+        else:
+            # Legacy feature extraction (backward compatibility)
+            exclude_cols = ['timestamp']
+            feature_cols = [col for col in feature_df.columns if col not in exclude_cols]
 
-        # Extract features for prediction (last row only)
-        latest_features = feature_df.iloc[-1:][feature_cols]
+            if not feature_cols:
+                raise ValueError("No feature columns computed - check feature engine")
 
-        # Check for NaN values
-        if latest_features.isna().any().any():
-            nan_cols = latest_features.columns[latest_features.isna().any()].tolist()
-            logger.warning(
-                f"NaN values in features: {nan_cols}. "
-                f"Need more data for indicators."
-            )
-            raise ValueError(
-                "Insufficient data for feature computation (NaN values present)"
-            )
+            # Extract features for prediction (last row only)
+            latest_features = feature_df.iloc[-1:][feature_cols]
+
+            # Check for NaN values
+            if latest_features.isna().any().any():
+                nan_cols = latest_features.columns[latest_features.isna().any()].tolist()
+                logger.warning(
+                    f"NaN values in features: {nan_cols}. "
+                    f"Need more data for indicators."
+                )
+                raise ValueError(
+                    "Insufficient data for feature computation (NaN values present)"
+                )
 
         # Run inference (CPU-bound, run in thread)
         logger.debug(f"Running inference on {len(latest_features.columns)} features")
@@ -246,6 +299,23 @@ class ModelPredictor:
         predicted_class = int(np.argmax(class_probs))
         confidence = float(np.max(class_probs))
 
+        # Build probabilities dict based on number of classes
+        num_classes = len(class_probs)
+        if num_classes == 2:
+            # Binary classification: 0=short, 1=long
+            probs_dict = {
+                'short': float(class_probs[0]),
+                'neutral': 0.0,  # No neutral in binary
+                'long': float(class_probs[1]),
+            }
+        else:
+            # 3-class classification: 0=short, 1=neutral, 2=long
+            probs_dict = {
+                'short': float(class_probs[0]),
+                'neutral': float(class_probs[1]),
+                'long': float(class_probs[2]),
+            }
+
         # Create prediction object
         prediction = Prediction(
             timestamp=current_timestamp,
@@ -253,11 +323,7 @@ class ModelPredictor:
             model_id=self.model_id,
             prediction=predicted_class,
             confidence=confidence,
-            probabilities={
-                'short': float(class_probs[0]),
-                'neutral': float(class_probs[1]),
-                'long': float(class_probs[2]),
-            }
+            probabilities=probs_dict
         )
 
         # Cache prediction

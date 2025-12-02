@@ -35,20 +35,25 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-api
-    command: ["python", "-m", "uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+    command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
     ports:
       - "8001:8000"  # Use 8001 locally to avoid conflict with Kirby API
     environment:
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
-      POLL_INTERVAL: ${POLL_INTERVAL:-2}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      API_WS_HEARTBEAT_INTERVAL: 30
+      API_WS_MAX_CONNECTIONS: 100
+      # Kirby WebSocket settings (for price data proxy)
+      KIRBY_WS_URL: ${KIRBY_WS_URL_PRO}
+      KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
     volumes:
       - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -65,7 +70,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-binance
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
@@ -92,7 +97,7 @@ services:
       STARLISTING_SOL_USDT_4H: ${STARLISTING_SOL_USDT_4H:-2}
 
       # Paper trading settings
-      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-10000.0}
       PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       # Environment mode (explicitly set to prod for Docker)
@@ -124,7 +129,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-hyperliquid
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
@@ -143,7 +148,7 @@ services:
       KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
 
       # Paper trading settings
-      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-100000.0}
+      PAPER_TRADING_INITIAL_CAPITAL: ${PAPER_TRADING_INITIAL_CAPITAL:-10000.0}
       PAPER_TRADING_LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       # Environment mode (explicitly set to prod for Docker)

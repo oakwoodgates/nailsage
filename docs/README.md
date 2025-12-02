@@ -2,8 +2,8 @@
 
 **ML Trading Research Platform for Cryptocurrency Markets**
 
-**Last Updated**: 2025-11-16
-**Current Phase**: Portfolio Coordination ✅ (21/25 milestones, 84%)
+**Last Updated**: 2025-11-27
+**Current Phase**: Phase 10 Complete ✅ - Live Trading Operational with Binary Classification
 
 ---
 
@@ -11,14 +11,18 @@
 
 ### Project Overview
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - High-level overview, goals, tech stack, and architecture
-- [STATUS.md](STATUS.md) - Current project status, recent accomplishments, and next steps
-- [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - Detailed progress tracker (21/25 milestones)
+- [ACTIVE_FILES.md](ACTIVE_FILES.md) - Single source of truth for active vs deprecated files
+- [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - Detailed progress tracker
+- [DOCKER.md](DOCKER.md) - Docker deployment and multi-strategy execution guide
 
 ### Strategy Development
-- [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md) - How to create and configure new trading strategies
+- [MODEL_TRAINING.md](MODEL_TRAINING.md) - How to train and validate models
+- [DOCKER.md](DOCKER.md) - How to deploy strategies with Docker
+- [DECISIONS.md](DECISIONS.md) - See ADR-014 (Binary Classification) and ADR-015 (Feature Caching) for Phase 10 improvements
 
 ### Architecture & Decisions
 - [DECISIONS.md](DECISIONS.md) - Architectural Decision Records (ADRs) documenting key design choices
+- [DATABASE.md](DATABASE.md) - Database schema, tables, views, and usage examples
 
 ---
 
@@ -76,31 +80,31 @@
 ## Project Status Summary
 
 ### ✅ What's Working
-1. **Config-Driven Strategy Development** - Define strategies in YAML, zero code changes needed
-2. **Modular Training Pipeline** - Generic scripts work across assets, timeframes, prediction targets
-3. **Walk-Forward Validation** - Time series cross-validation with realistic backtesting
-4. **Portfolio Coordination** - Multi-strategy position tracking with safety limits
-5. **Model Registry** - Centralized tracking with hybrid ID system for reproducibility
+1. **Binary Classification Models** - Phase 10 aggressive trading (SHORT/LONG only, no neutral)
+2. **Live Multi-Strategy Execution** - Docker-based paper trading with multiple strategies per exchange
+3. **Real-Time P&L Tracking** - Position profitability updated every candle
+4. **Transparent Signal Logging** - See exactly why signals are generated or suppressed
+5. **Walk-Forward Validation** - Time series cross-validation with realistic backtesting
+6. **Config-Driven Development** - Define strategies in YAML, zero code changes needed
+7. **Smart Feature Caching** - Enabled for training, disabled for live trading
+8. **Model Registry** - Centralized tracking with hybrid ID system for reproducibility
 
-### 🎯 Current Phase: Portfolio Coordination ✅
-- ✅ Position and signal tracking (dataclasses with validation)
-- ✅ Pass-through coordinator with safety checks
-- ✅ 21 unit tests (100% passing)
-- ✅ Documentation updated
-
-### 📈 Next Phase: Live Trading Infrastructure
-- [ ] Exchange Connector (Binance Futures API)
-- [ ] Live Strategy Runner (real-time signal generation)
-- [ ] Risk Manager (additional safety layer)
-- [ ] Monitoring & Alerts
+### 🎯 Current Phase: Phase 10 Complete ✅
+- ✅ Binary classification (SHORT/LONG signals)
+- ✅ Confidence-based filtering (minimum thresholds)
+- ✅ Signal cooldown (prevents spam)
+- ✅ Real-time P&L updates
+- ✅ Signal suppression logging
+- ✅ Live paper trading operational
+- ✅ Multi-strategy Docker deployment
 
 ### 📊 By The Numbers
-- **Progress**: 21/25 milestones (84%)
-- **Code**: 40+ files, ~6,000 LOC
-- **Strategies**: 2 trained (BTC short-term, SOL swing)
-- **Tests**: 40+ unit tests passing
-- **Assets**: BTC/USDT, SOL/USDT (perps)
-- **Indicators**: 9 technical indicators
+- **Live Trading**: Operational with real-time execution
+- **Strategies**: Multi-strategy support (Binance, Hyperliquid)
+- **Model Type**: Binary LightGBM classifiers
+- **Features**: 18 technical indicators (OHLCV excluded from model)
+- **Tests**: 145 unit tests passing
+- **Deployment**: Docker Compose with PostgreSQL
 
 ---
 

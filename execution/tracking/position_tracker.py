@@ -377,9 +377,12 @@ class PositionTracker:
 
         return positions
 
-    def get_total_unrealized_pnl(self) -> float:
+    def get_total_unrealized_pnl(self, strategy_id: Optional[int] = None) -> float:
         """
-        Get total unrealized P&L across all open positions.
+        Get total unrealized P&L across open positions.
+
+        Args:
+            strategy_id: Optional strategy ID to filter positions
 
         Returns:
             Total unrealized P&L in USD
@@ -387,18 +390,24 @@ class PositionTracker:
         total = sum(
             p.unrealized_pnl or 0.0
             for p in self._open_positions.values()
+            if strategy_id is None or p.strategy_id == strategy_id
         )
         return total
 
-    def get_total_exposure_usd(self) -> float:
+    def get_total_exposure_usd(self, strategy_id: Optional[int] = None) -> float:
         """
-        Get total exposure (notional value) across all open positions.
+        Get total exposure (notional value) across open positions.
+
+        Args:
+            strategy_id: Optional strategy ID to filter positions
 
         Returns:
             Total exposure in USD
         """
         total = 0.0
         for position in self._open_positions.values():
+            if strategy_id is not None and position.strategy_id != strategy_id:
+                continue
             # For both longs and shorts, exposure is size * entry_price
             notional = position.size * position.entry_price
             total += notional
@@ -426,15 +435,39 @@ class PositionTracker:
                 return True
         return False
 
-    def get_stats(self) -> dict:
+    def get_stats(self, strategy_id: Optional[int] = None) -> dict:
         """
         Get statistics about tracked positions.
 
+        Args:
+            strategy_id: Optional strategy ID to filter stats
+
         Returns:
-            Dict with statistics
+            Dict with statistics including P&L and win rate
         """
+        # Get realized P&L and closed position stats from database
+        total_realized_pnl = self.state_manager.get_total_realized_pnl(strategy_id)
+        closed_stats = self.state_manager.get_closed_positions_stats(strategy_id)
+
+        # Calculate win rate
+        total_closed = closed_stats['total_closed']
+        num_wins = closed_stats['num_wins']
+        num_losses = closed_stats['num_losses']
+        win_rate = (num_wins / total_closed * 100) if total_closed > 0 else 0.0
+
+        # Filter open positions by strategy_id if specified
+        open_positions = [
+            p for p in self._open_positions.values()
+            if strategy_id is None or p.strategy_id == strategy_id
+        ]
+
         return {
-            "num_open_positions": len(self._open_positions),
-            "total_unrealized_pnl": self.get_total_unrealized_pnl(),
-            "total_exposure_usd": self.get_total_exposure_usd(),
+            "num_open_positions": len(open_positions),
+            "total_unrealized_pnl": self.get_total_unrealized_pnl(strategy_id),
+            "total_exposure_usd": self.get_total_exposure_usd(strategy_id),
+            "total_realized_pnl": total_realized_pnl,
+            "num_wins": num_wins,
+            "num_losses": num_losses,
+            "total_closed": total_closed,
+            "win_rate": win_rate,
         }

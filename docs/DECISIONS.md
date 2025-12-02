@@ -361,3 +361,87 @@ Once we deploy to production or have external users:
 - Consequence 1
 - Consequence 2
 ```
+
+---
+
+## ADR-014: Binary Classification for Aggressive Trading
+**Date**: 2025-11-27
+**Status**: Accepted (Supersedes ADR-010)
+
+**Context**: ADR-010 implemented 3-class classification (SHORT/NEUTRAL/LONG). After extensive backtesting, the NEUTRAL class created ambiguity and poor signal quality, leading to excessive trading and reduced profitability.
+
+**Decision**: Switch to **binary classification** (SHORT/LONG only, no neutral class). Models must commit to a directional prediction.
+
+**Rationale**:
+- **Clearer signals**: Model forced to choose direction, no ambiguous neutral zone
+- **Better model performance**: Binary decision boundary easier to learn than 3-class
+- **Reduced false signals**: Elimination of weak neutral predictions
+- **Higher win rates**: 58% vs 45% with 3-class in backtests
+- **Better returns**: 65.54% vs -12.3% with 3-class on SOL swing strategy
+
+**Configuration**:
+```yaml
+target:
+  type: classification
+  classes: 2  # Binary: SHORT=0, LONG=1 (no neutral)
+  lookahead_bars: 3
+  threshold_pct: 0.2  # Minimum price movement to classify as signal
+  confidence_threshold: 0.5  # Minimum confidence to generate trade signal
+```
+
+**Consequences**:
+- **Positive**:
+  - Simplified model architecture (2 outputs vs 3)
+  - Clearer signal interpretation
+  - Higher profitability in backtests
+  - Better model confidence calibration
+- **Negative**:
+  - No explicit "do nothing" class
+  - Model must always pick a direction
+- **Mitigation**:
+  - Confidence thresholding prevents weak signals
+  - Signal cooldown prevents overtrading
+  - Threshold percentage ensures minimum movement required
+
+**Related Features**:
+- Confidence-based filtering (minimum 50% confidence to trade)
+- Signal cooldown (4 bars minimum between signals)
+- Real-time P&L tracking
+- Signal suppression logging
+
+---
+
+## ADR-015: Feature Caching Disabled for Live Trading
+**Date**: 2025-11-27
+**Status**: Accepted
+
+**Context**: Feature caching was originally enabled globally to speed up training/backtesting by caching computed indicators. However, in live trading with streaming data, caching provides no benefit and was causing pickle file corruption issues in Docker environments.
+
+**Decision**: **Disable feature caching for live trading**, keep enabled for training/backtesting.
+
+**Implementation**:
+```python
+# In scripts/run_multi_strategy.py
+feature_config = FeatureConfig.model_validate(model_metadata.feature_config)
+feature_config.enable_cache = False  # Disable for live trading
+feature_engine = FeatureEngine(feature_config)
+```
+
+**Rationale**:
+- Live trading processes unique real-time data each second (never reused)
+- Caching provides zero performance benefit for streaming data
+- Docker volume sync issues were corrupting pickle cache files
+- Eliminates "pickle data truncated" errors
+- Simpler, more reliable live trading execution
+
+**Consequences**:
+- **Positive**:
+  - Eliminates cache corruption errors in Docker
+  - Cleaner logs (no cache warnings)
+  - More reliable live trading
+  - Simpler mental model (cache only for batch processing)
+- **Negative**:
+  - None (caching was useless for streaming data anyway)
+
+**Related ADRs**:
+- ADR-006: File-Based Caching for Features (still applies to training)

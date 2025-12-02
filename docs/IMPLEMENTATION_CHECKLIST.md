@@ -200,7 +200,7 @@ Track progress toward MVP completion.
 The core NailSage paper trading MVP is **feature complete**! Here are potential next steps:
 
 ### Production Readiness
-1. **Request 500 historical candles** - Change from test (100) to production (500) in [run_paper_trading.py](../scripts/run_paper_trading.py:107)
+1. ✅ **Request 500 historical candles** - Already configured in [run_multi_strategy.py](../scripts/run_multi_strategy.py) (Docker entry point)
 2. **Run extended paper trading** - Let engine run for 24-48 hours to verify stability
 3. **Monitor performance** - Track trades, P&L, and system health
 4. **Add alerting** - Email/SMS alerts for errors, large losses, etc.
