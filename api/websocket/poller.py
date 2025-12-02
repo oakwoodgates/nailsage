@@ -14,6 +14,7 @@ from api.websocket.events import (
     emit_trade_event,
     emit_position_event,
     emit_portfolio_event,
+    emit_signal_event,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class DatabasePoller:
 
         # Tracking state
         self._last_trade_id: int = 0
+        self._last_signal_id: int = 0
         self._known_positions: Dict[int, dict] = {}  # id -> {status, updated_at}
         self._running = False
         self._task: Optional[asyncio.Task] = None
@@ -84,6 +86,11 @@ class DatabasePoller:
                 self._get_max_trade_id
             )
 
+            # Get current max signal ID
+            self._last_signal_id = await asyncio.to_thread(
+                self._get_max_signal_id
+            )
+
             # Get current open positions
             positions = await asyncio.to_thread(
                 self._state_manager.get_open_positions
@@ -97,6 +104,7 @@ class DatabasePoller:
 
             logger.info(
                 f"Initialized: last_trade_id={self._last_trade_id}, "
+                f"last_signal_id={self._last_signal_id}, "
                 f"positions={len(self._known_positions)}"
             )
         except Exception as e:
@@ -117,11 +125,27 @@ class DatabasePoller:
             logger.error(f"Error getting max trade ID: {e}")
             return 0
 
+    def _get_max_signal_id(self) -> int:
+        """Get the maximum signal ID from database."""
+        try:
+            engine = self._state_manager._get_engine()
+            from sqlalchemy import text
+
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT COALESCE(MAX(id), 0) FROM signals")
+                )
+                return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error getting max signal ID: {e}")
+            return 0
+
     async def _poll_loop(self) -> None:
         """Main polling loop."""
         while self._running:
             try:
                 await self._check_new_trades()
+                await self._check_new_signals()
                 await self._check_position_changes()
                 await self._emit_portfolio_update()
             except Exception as e:
@@ -169,6 +193,50 @@ class DatabasePoller:
 
     def _fetch_new_trades(self, engine, query: str, last_id: int) -> list:
         """Fetch new trades from database (sync)."""
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            result = conn.execute(text(query), {"last_id": last_id})
+            return [dict(row._mapping) for row in result]
+
+    async def _check_new_signals(self) -> None:
+        """Check for new signals and emit events."""
+        try:
+            engine = self._state_manager._get_engine()
+            from sqlalchemy import text
+
+            query = """
+                SELECT s.*, str.strategy_name
+                FROM signals s
+                LEFT JOIN strategies str ON s.strategy_id = str.id
+                WHERE s.id > :last_id
+                ORDER BY s.id ASC
+            """
+
+            new_signals = await asyncio.to_thread(
+                self._fetch_new_signals, engine, query, self._last_signal_id
+            )
+
+            for signal in new_signals:
+                await emit_signal_event(
+                    signal_id=signal["id"],
+                    strategy_id=signal["strategy_id"],
+                    strategy_name=signal.get("strategy_name", "Unknown"),
+                    starlisting_id=signal["starlisting_id"],
+                    signal_type=signal["signal_type"],
+                    confidence=signal.get("confidence"),
+                    price_at_signal=signal["price_at_signal"],
+                    was_executed=signal["was_executed"],
+                    rejection_reason=signal.get("rejection_reason"),
+                )
+                self._last_signal_id = signal["id"]
+                logger.debug(f"Emitted signal event for signal #{signal['id']}")
+
+        except Exception as e:
+            logger.error(f"Error checking new signals: {e}")
+
+    def _fetch_new_signals(self, engine, query: str, last_id: int) -> list:
+        """Fetch new signals from database (sync)."""
         from sqlalchemy import text
 
         with engine.connect() as conn:

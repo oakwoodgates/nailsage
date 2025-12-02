@@ -53,6 +53,10 @@ class ConnectionManager:
         # Reverse mapping: connection_id -> set of channels
         self.connection_channels: Dict[str, Set[str]] = {}
 
+        # Filter tracking: connection_id -> {channel -> filters}
+        # e.g., {"conn123": {"positions": {"strategy_id": 1}}}
+        self.connection_filters: Dict[str, Dict[str, Dict]] = {}
+
         # Lock for thread-safe operations
         self._lock = asyncio.Lock()
 
@@ -76,6 +80,7 @@ class ConnectionManager:
             connection_id = str(uuid4())
             self.active_connections[connection_id] = websocket
             self.connection_channels[connection_id] = set()
+            self.connection_filters[connection_id] = {}
 
             logger.info(
                 f"WebSocket connected: {connection_id} "
@@ -111,6 +116,8 @@ class ConnectionManager:
             del self.active_connections[connection_id]
             if connection_id in self.connection_channels:
                 del self.connection_channels[connection_id]
+            if connection_id in self.connection_filters:
+                del self.connection_filters[connection_id]
 
             logger.info(
                 f"WebSocket disconnected: {connection_id} "
@@ -121,12 +128,14 @@ class ConnectionManager:
         self,
         connection_id: str,
         channels: List[str],
+        filters: Optional[Dict] = None,
     ) -> SubscribeResponse:
         """Subscribe a connection to channels.
 
         Args:
             connection_id: Connection ID
             channels: List of channels to subscribe to
+            filters: Optional filters (e.g., {"strategy_id": 1})
 
         Returns:
             Subscription response
@@ -146,11 +155,16 @@ class ConnectionManager:
                     self.subscriptions[channel].add(connection_id)
                     self.connection_channels[connection_id].add(channel)
                     subscribed_channels.append(channel)
+
+                    # Store filters for this channel
+                    if filters:
+                        self.connection_filters[connection_id][channel] = filters
                 else:
                     logger.warning(f"Unknown channel: {channel}")
 
             logger.debug(
                 f"Connection {connection_id} subscribed to: {subscribed_channels}"
+                f"{' with filters: ' + str(filters) if filters else ''}"
             )
 
             return SubscribeResponse(
@@ -208,6 +222,10 @@ class ConnectionManager:
     ) -> int:
         """Broadcast a message to all subscribers of a channel.
 
+        Applies filters if the connection has any set for this channel.
+        Filters are applied by checking message["data"]["strategy_id"] against
+        the filter's strategy_id value.
+
         Args:
             channel: Channel to broadcast to
             message: Message to send
@@ -231,6 +249,17 @@ class ConnectionManager:
             if not websocket:
                 disconnected.append(conn_id)
                 continue
+
+            # Check filters
+            filters = self.connection_filters.get(conn_id, {}).get(channel, {})
+            if filters:
+                # Check strategy_id filter
+                filter_strategy_id = filters.get("strategy_id")
+                if filter_strategy_id is not None:
+                    msg_strategy_id = message.get("data", {}).get("strategy_id")
+                    if msg_strategy_id != filter_strategy_id:
+                        # Skip this connection - doesn't match filter
+                        continue
 
             try:
                 await websocket.send_json(message)
@@ -310,6 +339,11 @@ class ConnectionManager:
         Args:
             connection_id: Connection ID
             data: Raw message data
+
+        Message formats:
+            Subscribe: {"action": "subscribe", "channels": ["trades"], "filters": {"strategy_id": 1}}
+            Unsubscribe: {"action": "unsubscribe", "channels": ["trades"]}
+            Ping: {"action": "ping"}
         """
         try:
             message = json.loads(data)
@@ -317,13 +351,35 @@ class ConnectionManager:
 
             if action == "subscribe":
                 channels = message.get("channels", [])
-                response = await self.subscribe(connection_id, channels)
+                filters = message.get("filters")  # Optional filters
+                response = await self.subscribe(connection_id, channels, filters)
                 await self.send_to_connection(connection_id, response.model_dump())
+
+                # Handle special price subscriptions via KirbyBridge
+                if "prices" in channels:
+                    starlisting_ids = message.get("starlisting_ids", [])
+                    history = message.get("history", 500)
+                    if starlisting_ids:
+                        from api.websocket.kirby_bridge import get_kirby_bridge
+                        bridge = get_kirby_bridge()
+                        if bridge:
+                            await bridge.subscribe(connection_id, starlisting_ids, history)
+                        else:
+                            logger.warning(
+                                "KirbyBridge not available - price subscriptions disabled"
+                            )
 
             elif action == "unsubscribe":
                 channels = message.get("channels", [])
                 response = await self.unsubscribe(connection_id, channels)
                 await self.send_to_connection(connection_id, response.model_dump())
+
+                # Handle price unsubscriptions
+                if "prices" in channels:
+                    from api.websocket.kirby_bridge import get_kirby_bridge
+                    bridge = get_kirby_bridge()
+                    if bridge:
+                        await bridge.unsubscribe(connection_id)
 
             elif action == "ping":
                 await self.send_to_connection(connection_id, {"type": "pong"})

@@ -392,3 +392,44 @@ async def emit_price_event(
             "volume": volume,
         },
     )
+
+
+async def emit_signal_event(
+    signal_id: int,
+    strategy_id: int,
+    strategy_name: str,
+    starlisting_id: int,
+    signal_type: str,
+    confidence: Optional[float],
+    price_at_signal: float,
+    was_executed: bool,
+    rejection_reason: Optional[str] = None,
+) -> None:
+    """Emit a signal generated event.
+
+    Args:
+        signal_id: Signal ID
+        strategy_id: Strategy ID
+        strategy_name: Strategy name
+        starlisting_id: Starlisting ID
+        signal_type: Signal type ('long', 'short', 'neutral', 'close')
+        confidence: Model confidence (0-1)
+        price_at_signal: Price when signal was generated
+        was_executed: Whether signal was acted upon
+        rejection_reason: Reason for rejection if not executed
+    """
+    dispatcher = EventDispatcher.get_instance()
+    await dispatcher.emit(
+        EventType.SIGNAL_GENERATED,
+        {
+            "signal_id": signal_id,
+            "strategy_id": strategy_id,
+            "strategy_name": strategy_name,
+            "starlisting_id": starlisting_id,
+            "signal_type": signal_type,
+            "confidence": confidence,
+            "price_at_signal": price_at_signal,
+            "was_executed": was_executed,
+            "rejection_reason": rejection_reason,
+        },
+    )

@@ -23,12 +23,14 @@ from api.routers.trades import router as trades_router
 from api.routers.positions import router as positions_router
 from api.routers.portfolio import router as portfolio_router
 from api.routers.stats import router as stats_router
+from api.routers.candles import router as candles_router
 from api.middleware.logging import RequestLoggingMiddleware
 from api.middleware.error_handler import ErrorHandlerMiddleware
 from api.websocket.manager import get_connection_manager
 from api.websocket.events import EventDispatcher
 from api.websocket.handlers import WebSocketHandler
 from api.websocket.poller import DatabasePoller
+from api.websocket.kirby_bridge import KirbyBridge, set_kirby_bridge
 
 # Configure logging
 logging.basicConfig(
@@ -65,12 +67,31 @@ async def lifespan(app: FastAPI):
     )
     await poller.start()
 
+    # Start KirbyBridge for price data proxy (if configured)
+    config = get_config()
+    kirby_bridge = None
+    if config.kirby_ws_url and config.kirby_api_key:
+        kirby_bridge = KirbyBridge(
+            kirby_url=config.kirby_ws_url,
+            kirby_api_key=config.kirby_api_key,
+            connection_manager=connection_manager,
+        )
+        set_kirby_bridge(kirby_bridge)
+        await kirby_bridge.start()
+        logger.info("KirbyBridge started for price data proxy")
+    else:
+        logger.info("KirbyBridge not configured - price subscriptions disabled")
+
     logger.info("Nailsage API server started successfully")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Nailsage API server...")
+
+    # Stop KirbyBridge
+    if kirby_bridge:
+        await kirby_bridge.stop()
 
     # Stop database poller
     await poller.stop()
@@ -162,6 +183,7 @@ ws.onmessage = (event) => {
     app.include_router(positions_router)
     app.include_router(portfolio_router)
     app.include_router(stats_router)
+    app.include_router(candles_router)
 
     # WebSocket endpoint
     @app.websocket("/ws")

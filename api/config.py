@@ -54,6 +54,33 @@ class APIConfig(BaseSettings):
         description="Allow CORS credentials"
     )
 
+    # Kirby WebSocket settings (for price data proxy)
+    # These use KIRBY_WS_URL and KIRBY_API_KEY env vars (same as binance container)
+    kirby_ws_url: Optional[str] = Field(
+        default=None,
+        description="Kirby WebSocket URL (wss://...)"
+    )
+    kirby_api_key: Optional[str] = Field(
+        default=None,
+        description="Kirby API key (kb_...)"
+    )
+
+    @field_validator("kirby_ws_url", mode="before")
+    @classmethod
+    def get_kirby_ws_url(cls, v: Optional[str]) -> Optional[str]:
+        """Fall back to KIRBY_WS_URL env var if not set."""
+        if v:
+            return v
+        return os.getenv("KIRBY_WS_URL")
+
+    @field_validator("kirby_api_key", mode="before")
+    @classmethod
+    def get_kirby_api_key(cls, v: Optional[str]) -> Optional[str]:
+        """Fall back to KIRBY_API_KEY env var if not set."""
+        if v:
+            return v
+        return os.getenv("KIRBY_API_KEY")
+
     # Portfolio settings
     initial_capital: float = Field(
         default=100000.0,

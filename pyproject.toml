@@ -50,6 +50,7 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "websockets>=12.0",  # WebSocket support for live updates
     "psycopg2-binary>=2.9.0",  # PostgreSQL driver
+    "httpx>=0.25.0",  # HTTP client for async requests
 
     # Date/Time
     "python-dateutil>=2.8.0",
