@@ -28,6 +28,7 @@ from api.middleware.error_handler import ErrorHandlerMiddleware
 from api.websocket.manager import get_connection_manager
 from api.websocket.events import EventDispatcher
 from api.websocket.handlers import WebSocketHandler
+from api.websocket.poller import DatabasePoller
 
 # Configure logging
 logging.basicConfig(
@@ -55,12 +56,24 @@ async def lifespan(app: FastAPI):
     event_dispatcher.set_connection_manager(connection_manager)
     await event_dispatcher.start()
 
+    # Start database poller for cross-container event emission
+    state_manager = get_state_manager()
+    poller = DatabasePoller(
+        state_manager=state_manager,
+        event_dispatcher=event_dispatcher,
+        interval=3.0,
+    )
+    await poller.start()
+
     logger.info("Nailsage API server started successfully")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Nailsage API server...")
+
+    # Stop database poller
+    await poller.stop()
 
     # Stop event dispatcher
     await event_dispatcher.stop()
