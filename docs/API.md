@@ -70,6 +70,8 @@ List all strategies.
       "interval": "15m",
       "model_id": "model_abc123",
       "is_active": true,
+      "initial_bankroll": 10000.00,
+      "current_bankroll": 9500.00,
       "created_at": 1700000000000,
       "updated_at": 1700000000000
     }
@@ -92,6 +94,8 @@ Get strategy by ID.
   "interval": "15m",
   "model_id": "model_abc123",
   "is_active": true,
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
   "created_at": 1700000000000,
   "updated_at": 1700000000000
 }
@@ -111,6 +115,8 @@ Get strategy with performance statistics.
   "interval": "15m",
   "model_id": "model_abc123",
   "is_active": true,
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
   "created_at": 1700000000000,
   "updated_at": 1700000000000,
   "total_trades": 150,
@@ -148,6 +154,59 @@ Get positions for a specific strategy.
 | status | string | null | Filter by status (open/closed) |
 | limit | integer | 100 | Number of positions (1-1000) |
 | offset | integer | 0 | Pagination offset |
+
+#### GET /api/v1/strategies/{id}/bankroll
+
+Get current bankroll for a strategy.
+
+**Response:**
+```json
+{
+  "strategy_id": 1,
+  "strategy_name": "btc_scalper",
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
+  "pnl": -500.00,
+  "pnl_pct": -5.0,
+  "is_active": true
+}
+```
+
+**Response Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `strategy_id` | integer | Strategy ID |
+| `strategy_name` | string | Strategy name |
+| `initial_bankroll` | float | Starting capital (USDT) |
+| `current_bankroll` | float | Current capital after P&L (USDT) |
+| `pnl` | float | Total P&L (current - initial) |
+| `pnl_pct` | float | P&L as percentage |
+| `is_active` | boolean | Whether strategy can trade (bankroll > 0) |
+
+#### PATCH /api/v1/strategies/{id}/bankroll
+
+Update/replenish strategy bankroll. Use this endpoint to manually adjust a strategy's bankroll, such as replenishing a depleted strategy.
+
+**Request Body:**
+```json
+{
+  "bankroll": 15000.00
+}
+```
+
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `bankroll` | float | Yes | New bankroll value (USDT), must be > 0 |
+
+**Response:** Same as GET /api/v1/strategies/{id}/bankroll
+
+**Example: Replenish a depleted strategy**
+```bash
+curl -X PATCH http://localhost:8000/api/v1/strategies/1/bankroll \
+  -H "Content-Type: application/json" \
+  -d '{"bankroll": 10000.00}'
+```
 
 ---
 

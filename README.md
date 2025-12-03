@@ -26,6 +26,9 @@ NailSage is a production-ready ML trading research platform designed for buildin
 - **✅ Real-Time P&L Updates**: Position profitability updated every candle
 - **✅ Transparent Decision Logging**: See why signals are generated or suppressed
 - **✅ Smart Feature Caching**: Enabled for training/backtesting, disabled for live trading
+- **✅ Per-Strategy Bankroll**: Isolated $10k bankroll per strategy with percentage-based sizing
+- **✅ Automatic Position Sizing**: Trades sized at 10% of current strategy bankroll
+- **✅ Bankroll Depletion Protection**: Strategies auto-pause when bankroll <= $0
 
 ## 🚀 Quick Start
 
