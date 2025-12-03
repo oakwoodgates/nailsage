@@ -1,23 +1,43 @@
 """Signal generator that converts model predictions into trading signals.
 
 This module provides:
+- Multi-mode classification support (binary, 3-class, 5-class)
+- Automatic mode detection from prediction probabilities
 - Confidence-based filtering
 - Signal deduplication
 - Cooldown periods between signals
-- Position size calculation
+- Position size calculation (percentage of strategy bankroll)
 - Integration with StrategySignal format
+
+Classification Modes:
+    Binary (2-class): Aggressive trading, always in position
+        - Class 0 → Short (-1)
+        - Class 1 → Long (+1)
+
+    3-class: Standard mode, can stay flat
+        - Class 0 → Short (-1)
+        - Class 1 → Neutral (0)
+        - Class 2 → Long (+1)
+
+    5-class: Graduated confidence levels
+        - Class 0 → Strong Short (-1)
+        - Class 1 → Weak Short (-1)
+        - Class 2 → Neutral (0)
+        - Class 3 → Weak Long (+1)
+        - Class 4 → Strong Long (+1)
 
 Example usage:
     generator = SignalGenerator(
         strategy_name="momentum_classifier_v1",
         asset="BTC/USDT",
         confidence_threshold=0.6,
-        position_size_usd=10000.0,
+        position_size_pct=10.0,  # 10% of bankroll per trade
         cooldown_bars=4,
     )
 
-    # Convert prediction to signal
-    signal = generator.generate_signal(prediction)
+    # Convert prediction to signal (with current bankroll)
+    # Mode is auto-detected from prediction.probabilities
+    signal = generator.generate_signal(prediction, current_bankroll=9500.0)
 
     if signal:
         # Signal was generated (confidence threshold met, not duplicate)
@@ -43,7 +63,7 @@ class SignalGeneratorConfig:
         strategy_name: Name of the strategy
         asset: Trading pair (e.g., 'BTC/USDT')
         confidence_threshold: Minimum confidence to generate signal (0.0-1.0)
-        position_size_usd: Position size in USD
+        position_size_pct: Position size as percentage of current bankroll (0-100)
         cooldown_bars: Minimum bars between signals (prevents spam)
         allow_neutral_signals: If True, emit neutral signals (close positions)
     """
@@ -51,7 +71,7 @@ class SignalGeneratorConfig:
     strategy_name: str
     asset: str
     confidence_threshold: float = 0.6
-    position_size_usd: float = 10000.0
+    position_size_pct: float = 10.0  # 10% of bankroll per trade
     cooldown_bars: int = 4
     allow_neutral_signals: bool = True
 
@@ -62,10 +82,10 @@ class SignalGeneratorConfig:
                 f"confidence_threshold must be between 0 and 1, "
                 f"got {self.confidence_threshold}"
             )
-        if self.position_size_usd <= 0:
+        if not 0.0 < self.position_size_pct <= 100.0:
             raise ValueError(
-                f"position_size_usd must be positive, "
-                f"got {self.position_size_usd}"
+                f"position_size_pct must be between 0 and 100, "
+                f"got {self.position_size_pct}"
             )
         if self.cooldown_bars < 0:
             raise ValueError(
@@ -109,7 +129,7 @@ class SignalGenerator:
             extra={
                 "asset": config.asset,
                 "confidence_threshold": config.confidence_threshold,
-                "position_size_usd": config.position_size_usd,
+                "position_size_pct": config.position_size_pct,
                 "cooldown_bars": config.cooldown_bars,
             }
         )
@@ -119,6 +139,7 @@ class SignalGenerator:
         prediction: Prediction,
         candle_interval_ms: int = 900000,  # 15 minutes default
         has_open_positions: bool = False,
+        current_bankroll: float = 10000.0,
     ) -> Optional[StrategySignal]:
         """
         Generate a trading signal from a prediction.
@@ -127,6 +148,7 @@ class SignalGenerator:
             prediction: Prediction from ModelPredictor
             candle_interval_ms: Interval between candles in milliseconds
             has_open_positions: True if there are currently open positions
+            current_bankroll: Current strategy bankroll in USD (for position sizing)
 
         Returns:
             StrategySignal if conditions met, None otherwise
@@ -138,18 +160,19 @@ class SignalGenerator:
         3. Cooldown period has elapsed since last signal
         4. If neutral signal, check allow_neutral_signals config
         """
-        # Convert prediction class to signal direction
-        signal_direction = self._prediction_to_signal(prediction.prediction)
+        # Detect number of classes and convert prediction to signal direction
+        num_classes = self._detect_num_classes(prediction)
+        signal_direction = self._prediction_to_signal(prediction.prediction, num_classes)
 
         # Check if neutral signals are allowed
         if signal_direction == 0 and not self.config.allow_neutral_signals:
-            logger.info("❌ Signal suppressed: Neutral signal not allowed")
+            logger.info("Signal suppressed: Neutral signal not allowed")
             return None
 
         # Check confidence threshold
         if prediction.confidence < self.config.confidence_threshold:
             logger.info(
-                f"❌ Signal suppressed: Confidence {prediction.confidence:.2%} "
+                f"Signal suppressed: Confidence {prediction.confidence:.2%} "
                 f"< threshold {self.config.confidence_threshold:.2%}"
             )
             return None
@@ -162,7 +185,7 @@ class SignalGenerator:
         if is_duplicate and not is_closing_signal:
             signal_name = {-1: "SHORT", 0: "NEUTRAL", 1: "LONG"}[signal_direction]
             logger.info(
-                f"❌ Signal suppressed: {signal_name} is duplicate of last signal"
+                f"Signal suppressed: {signal_name} is duplicate of last signal"
             )
             return None
 
@@ -179,10 +202,13 @@ class SignalGenerator:
                 candle_interval_ms
             )
             logger.info(
-                f"❌ Signal suppressed: Cooldown period "
+                f"Signal suppressed: Cooldown period "
                 f"({bars_since_last}/{self.config.cooldown_bars} bars elapsed)"
             )
             return None
+
+        # Calculate position size as percentage of current bankroll
+        position_size_usd = current_bankroll * (self.config.position_size_pct / 100.0)
 
         # All checks passed - generate signal
         signal = StrategySignal(
@@ -191,7 +217,7 @@ class SignalGenerator:
             signal=signal_direction,
             confidence=prediction.confidence,
             timestamp=prediction.datetime,
-            position_size_usd=self.config.position_size_usd,
+            position_size_usd=position_size_usd,
         )
 
         # Update state
@@ -200,47 +226,106 @@ class SignalGenerator:
         self._signals_generated += 1
 
         logger.info(
-            f"✅ Generated signal #{self._signals_generated}: "
+            f"Generated signal #{self._signals_generated}: "
             f"{signal.direction_name.upper()} "
-            f"(confidence: {signal.confidence:.2%})",
+            f"(confidence: {signal.confidence:.2%}, size: ${position_size_usd:.2f})",
             extra={
                 "signal": signal_direction,
                 "confidence": prediction.confidence,
                 "timestamp": prediction.timestamp,
+                "position_size_usd": position_size_usd,
+                "bankroll": current_bankroll,
             }
         )
 
         return signal
 
-    def _prediction_to_signal(self, prediction_class: int) -> int:
+    def _detect_num_classes(self, prediction: Prediction) -> int:
+        """
+        Detect the number of classification classes from prediction.
+
+        Detection logic:
+        - If probabilities dict has 'neutral' key with value 0.0 → binary (2-class)
+        - If max prediction class is 4 → 5-class
+        - Otherwise → 3-class (default)
+
+        Args:
+            prediction: Prediction object with probabilities dict
+
+        Returns:
+            Number of classes (2, 3, or 5)
+        """
+        # Check for binary model (neutral probability is 0.0)
+        if prediction.probabilities.get('neutral', 0.0) == 0.0:
+            return 2
+
+        # Check for 5-class model (has 'strong_short', 'weak_short', etc.)
+        if 'strong_short' in prediction.probabilities or 'weak_long' in prediction.probabilities:
+            return 5
+
+        # Check by max prediction class value
+        if prediction.prediction >= 4:
+            return 5
+
+        # Default to 3-class
+        return 3
+
+    def _prediction_to_signal(self, prediction_class: int, num_classes: int = 3) -> int:
         """
         Convert prediction class to signal direction.
 
-        Supports both binary and 3-class classification:
-        - Binary: 0=short, 1=long
-        - 3-class: 0=short, 1=neutral, 2=long
+        Supports multiple classification modes:
+
+        Binary (2-class) - aggressive, always in position:
+        - Class 0 → Short (-1)
+        - Class 1 → Long (+1)
+
+        3-class - standard, can stay flat:
+        - Class 0 → Short (-1)
+        - Class 1 → Neutral (0)
+        - Class 2 → Long (+1)
+
+        5-class - graduated confidence:
+        - Class 0 → Strong Short (-1)
+        - Class 1 → Weak Short (-1)
+        - Class 2 → Neutral (0)
+        - Class 3 → Weak Long (+1)
+        - Class 4 → Strong Long (+1)
 
         Args:
-            prediction_class: Prediction class (0, 1, or 2)
+            prediction_class: Prediction class from model
+            num_classes: Number of classification classes (2, 3, or 5)
 
         Returns:
             Signal direction: -1=short, 0=neutral, 1=long
         """
-        # Binary classification (2 classes)
-        if prediction_class in [0, 1]:
+        if num_classes == 2:
+            # Binary: 0=short, 1=long (no neutral)
             mapping = {
                 0: -1,  # short
                 1: 1,   # long
             }
             return mapping.get(prediction_class, 0)
 
-        # 3-class classification (fallback for legacy models)
-        mapping_3class = {
-            0: -1,  # short
-            1: 0,   # neutral
-            2: 1,   # long
-        }
-        return mapping_3class.get(prediction_class, 0)
+        elif num_classes == 5:
+            # 5-class: strong/weak short, neutral, weak/strong long
+            mapping = {
+                0: -1,  # strong short
+                1: -1,  # weak short
+                2: 0,   # neutral
+                3: 1,   # weak long
+                4: 1,   # strong long
+            }
+            return mapping.get(prediction_class, 0)
+
+        else:
+            # 3-class (default): short, neutral, long
+            mapping = {
+                0: -1,  # short
+                1: 0,   # neutral
+                2: 1,   # long
+            }
+            return mapping.get(prediction_class, 0)
 
     def _is_cooldown_elapsed(
         self,
@@ -308,4 +393,5 @@ class SignalGenerator:
             "strategy_name": self.config.strategy_name,
             "asset": self.config.asset,
             "confidence_threshold": self.config.confidence_threshold,
+            "position_size_pct": self.config.position_size_pct,
         }
