@@ -52,7 +52,7 @@ class TradeService:
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
                     WHERE t.strategy_id = :strategy_id
-                    ORDER BY t.timestamp DESC
+                    ORDER BY t.timestamp DESC, t.id DESC
                     LIMIT :limit OFFSET :offset
                 """
                 count_query = "SELECT COUNT(*) FROM trades WHERE strategy_id = :strategy_id"
@@ -63,7 +63,7 @@ class TradeService:
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
-                    ORDER BY t.timestamp DESC
+                    ORDER BY t.timestamp DESC, t.id DESC
                     LIMIT :limit OFFSET :offset
                 """
                 count_query = "SELECT COUNT(*) FROM trades"
@@ -191,7 +191,7 @@ class TradeService:
                     LEFT JOIN positions p ON t.position_id = p.id
                     WHERE t.timestamp >= :start_ts AND t.timestamp <= :end_ts
                     AND t.strategy_id = :strategy_id
-                    ORDER BY t.timestamp DESC
+                    ORDER BY t.timestamp DESC, t.id DESC
                 """
                 params["strategy_id"] = strategy_id
             else:
@@ -201,7 +201,7 @@ class TradeService:
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
                     WHERE t.timestamp >= :start_ts AND t.timestamp <= :end_ts
-                    ORDER BY t.timestamp DESC
+                    ORDER BY t.timestamp DESC, t.id DESC
                 """
 
             result = conn.execute(text(query), params)
