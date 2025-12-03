@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from api.schemas.common import PaginationParams, PaginatedResponse, ErrorResponse
-from api.schemas.strategies import StrategyResponse, StrategyWithStats
+from api.schemas.strategies import StrategyResponse, StrategyWithStats, BankrollResponse, BankrollUpdateRequest
 from api.schemas.trades import TradeResponse
 from api.schemas.positions import PositionResponse
 from api.schemas.portfolio import PortfolioSummary, AllocationItem
@@ -263,3 +263,74 @@ class TestWebSocketSchemas:
         )
         assert message.type == "trade.new"
         assert message.channel == "trades"
+
+
+class TestBankrollSchemas:
+    """Tests for Bankroll schemas."""
+
+    def test_bankroll_response_profitable(self):
+        """Test bankroll response with profit."""
+        response = BankrollResponse(
+            strategy_id=1,
+            strategy_name="test_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=12000.0,
+            pnl=2000.0,
+            pnl_pct=20.0,
+            is_active=True,
+        )
+        assert response.strategy_id == 1
+        assert response.initial_bankroll == 10000.0
+        assert response.current_bankroll == 12000.0
+        assert response.pnl == 2000.0
+        assert response.pnl_pct == 20.0
+        assert response.is_active is True
+
+    def test_bankroll_response_loss(self):
+        """Test bankroll response with loss."""
+        response = BankrollResponse(
+            strategy_id=2,
+            strategy_name="losing_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=7500.0,
+            pnl=-2500.0,
+            pnl_pct=-25.0,
+            is_active=True,
+        )
+        assert response.pnl == -2500.0
+        assert response.pnl_pct == -25.0
+        assert response.is_active is True
+
+    def test_bankroll_response_depleted(self):
+        """Test bankroll response when depleted (inactive)."""
+        response = BankrollResponse(
+            strategy_id=3,
+            strategy_name="depleted_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=0.0,
+            pnl=-10000.0,
+            pnl_pct=-100.0,
+            is_active=False,
+        )
+        assert response.current_bankroll == 0.0
+        assert response.is_active is False
+
+    def test_bankroll_update_request_valid(self):
+        """Test valid bankroll update request."""
+        request = BankrollUpdateRequest(bankroll=15000.0)
+        assert request.bankroll == 15000.0
+
+    def test_bankroll_update_request_minimum(self):
+        """Test bankroll update with small positive value."""
+        request = BankrollUpdateRequest(bankroll=0.01)
+        assert request.bankroll == 0.01
+
+    def test_bankroll_update_request_zero_invalid(self):
+        """Test bankroll update with zero is invalid."""
+        with pytest.raises(ValidationError):
+            BankrollUpdateRequest(bankroll=0)
+
+    def test_bankroll_update_request_negative_invalid(self):
+        """Test bankroll update with negative value is invalid."""
+        with pytest.raises(ValidationError):
+            BankrollUpdateRequest(bankroll=-1000.0)
