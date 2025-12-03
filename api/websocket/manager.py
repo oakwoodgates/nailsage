@@ -103,12 +103,16 @@ class ConnectionManager:
         Args:
             connection_id: ID of the connection to remove
         """
+        was_subscribed_to_prices = False
+
         async with self._lock:
             if connection_id not in self.active_connections:
                 return
 
             # Remove from all subscriptions
             channels = self.connection_channels.get(connection_id, set())
+            was_subscribed_to_prices = "prices" in channels
+
             for channel in channels:
                 self.subscriptions[channel].discard(connection_id)
 
@@ -123,6 +127,14 @@ class ConnectionManager:
                 f"WebSocket disconnected: {connection_id} "
                 f"(total: {len(self.active_connections)})"
             )
+
+        # Clean up KirbyBridge subscription (outside lock to avoid deadlock)
+        if was_subscribed_to_prices:
+            from api.websocket.kirby_bridge import get_kirby_bridge
+            bridge = get_kirby_bridge()
+            if bridge:
+                await bridge.unsubscribe(connection_id)
+                logger.debug(f"Cleaned up KirbyBridge subscription for {connection_id}")
 
     async def subscribe(
         self,

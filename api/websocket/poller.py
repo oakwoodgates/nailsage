@@ -244,7 +244,16 @@ class DatabasePoller:
             return [dict(row._mapping) for row in result]
 
     async def _check_position_changes(self) -> None:
-        """Check for position changes and emit events."""
+        """Check for position changes and emit events.
+
+        IMPORTANT: Events are emitted in logical order:
+        1. position.closed (for positions that were closed)
+        2. position.opened (for new positions)
+        3. position.pnl_update (for existing open positions)
+
+        This ensures that during position reversals (close old, open new),
+        the close event is always emitted before the open event.
+        """
         try:
             # Get open positions
             open_positions = await asyncio.to_thread(
@@ -257,12 +266,42 @@ class DatabasePoller:
             )
             strategy_names = {s.id: s.strategy_name for s in strategies}
 
-            # Track which positions we've seen this cycle
+            # Build set of current open position IDs and map for quick lookup
             current_open_ids = set()
+            open_positions_map = {}
+            for pos in open_positions:
+                current_open_ids.add(pos.id)
+                open_positions_map[pos.id] = pos
 
+            # STEP 1: Check for CLOSED positions first (emit position.closed)
+            # This must happen before checking for new opens to maintain correct order
+            for pos_id, known in list(self._known_positions.items()):
+                if known["status"] == "open" and pos_id not in current_open_ids:
+                    # Position was closed - fetch details
+                    closed_pos = await asyncio.to_thread(
+                        self._state_manager.get_position_by_id, pos_id
+                    )
+                    if closed_pos and closed_pos.status == "closed":
+                        await emit_position_event(
+                            event_type=EventType.POSITION_CLOSED,
+                            position_id=pos_id,
+                            strategy_id=closed_pos.strategy_id,
+                            strategy_name=known.get("strategy_name", "Unknown"),
+                            starlisting_id=closed_pos.starlisting_id,
+                            side=closed_pos.side,
+                            size=closed_pos.size,
+                            entry_price=closed_pos.entry_price,
+                            status="closed",
+                            realized_pnl=getattr(closed_pos, "realized_pnl", None),
+                            exit_price=getattr(closed_pos, "exit_price", None),
+                            exit_reason=getattr(closed_pos, "exit_reason", None),
+                        )
+                        self._known_positions[pos_id]["status"] = "closed"
+                        logger.debug(f"Emitted position.closed for #{pos_id}")
+
+            # STEP 2: Check for NEW positions (emit position.opened)
             for pos in open_positions:
                 pos_id = pos.id
-                current_open_ids.add(pos_id)
                 strategy_name = strategy_names.get(pos.strategy_id, "Unknown")
 
                 if pos_id not in self._known_positions:
@@ -290,49 +329,28 @@ class DatabasePoller:
                     }
                     logger.debug(f"Emitted position.opened for #{pos_id}")
 
-                else:
-                    # Check for P&L updates on open positions
+            # STEP 3: Check for P&L updates on existing open positions
+            for pos in open_positions:
+                pos_id = pos.id
+                if pos_id in self._known_positions:
                     known = self._known_positions[pos_id]
-                    current_pnl = getattr(pos, "unrealized_pnl", None)
-                    if current_pnl != known.get("unrealized_pnl"):
-                        await emit_position_event(
-                            event_type=EventType.POSITION_PNL_UPDATE,
-                            position_id=pos_id,
-                            strategy_id=pos.strategy_id,
-                            strategy_name=strategy_name,
-                            starlisting_id=pos.starlisting_id,
-                            side=pos.side,
-                            size=pos.size,
-                            entry_price=pos.entry_price,
-                            status="open",
-                            unrealized_pnl=current_pnl,
-                        )
-                        self._known_positions[pos_id]["unrealized_pnl"] = current_pnl
-
-            # Check for closed positions (were open, now not in open list)
-            for pos_id, known in list(self._known_positions.items()):
-                if known["status"] == "open" and pos_id not in current_open_ids:
-                    # Position was closed - fetch details
-                    closed_pos = await asyncio.to_thread(
-                        self._state_manager.get_position_by_id, pos_id
-                    )
-                    if closed_pos and closed_pos.status == "closed":
-                        await emit_position_event(
-                            event_type=EventType.POSITION_CLOSED,
-                            position_id=pos_id,
-                            strategy_id=closed_pos.strategy_id,
-                            strategy_name=known.get("strategy_name", "Unknown"),
-                            starlisting_id=closed_pos.starlisting_id,
-                            side=closed_pos.side,
-                            size=closed_pos.size,
-                            entry_price=closed_pos.entry_price,
-                            status="closed",
-                            realized_pnl=getattr(closed_pos, "realized_pnl", None),
-                            exit_price=getattr(closed_pos, "exit_price", None),
-                            exit_reason=getattr(closed_pos, "exit_reason", None),
-                        )
-                        self._known_positions[pos_id]["status"] = "closed"
-                        logger.debug(f"Emitted position.closed for #{pos_id}")
+                    if known["status"] == "open":
+                        strategy_name = strategy_names.get(pos.strategy_id, "Unknown")
+                        current_pnl = getattr(pos, "unrealized_pnl", None)
+                        if current_pnl != known.get("unrealized_pnl"):
+                            await emit_position_event(
+                                event_type=EventType.POSITION_PNL_UPDATE,
+                                position_id=pos_id,
+                                strategy_id=pos.strategy_id,
+                                strategy_name=strategy_name,
+                                starlisting_id=pos.starlisting_id,
+                                side=pos.side,
+                                size=pos.size,
+                                entry_price=pos.entry_price,
+                                status="open",
+                                unrealized_pnl=current_pnl,
+                            )
+                            self._known_positions[pos_id]["unrealized_pnl"] = current_pnl
 
         except Exception as e:
             logger.error(f"Error checking position changes: {e}")
