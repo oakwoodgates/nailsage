@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS strategies (
     model_id TEXT,  -- NailSage model ID (from model registry)
     config_path TEXT,  -- Path to strategy YAML config
     is_active BOOLEAN NOT NULL DEFAULT 1,
+    initial_bankroll REAL NOT NULL DEFAULT 10000.0,  -- Starting capital for this strategy (USDT)
+    current_bankroll REAL NOT NULL DEFAULT 10000.0,  -- Current capital after P&L (USDT)
     created_at INTEGER NOT NULL,  -- Unix timestamp (milliseconds)
     updated_at INTEGER NOT NULL,  -- Unix timestamp (milliseconds)
 

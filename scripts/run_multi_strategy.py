@@ -219,11 +219,12 @@ class MultiStrategyEngine:
 
         # Initialize signal generator
         # Get config from environment or use defaults
+        # Position size is now a percentage of the strategy's current bankroll (default: 10%)
         signal_gen_config = SignalGeneratorConfig(
             strategy_name=strategy_id,
             asset=f"{symbol}/USDT",
             confidence_threshold=float(os.getenv(f'{strategy_id.upper()}_CONFIDENCE_THRESHOLD', '0.5')),
-            position_size_usd=float(os.getenv(f'{strategy_id.upper()}_POSITION_SIZE', '10000.0')),
+            position_size_pct=float(os.getenv(f'{strategy_id.upper()}_POSITION_SIZE_PCT', '10.0')),
             cooldown_bars=int(os.getenv(f'{strategy_id.upper()}_COOLDOWN_BARS', '4')),
             allow_neutral_signals=True,
         )
@@ -356,12 +357,27 @@ class MultiStrategyEngine:
             stats = strategy.get_stats()
             pos_stats = stats['position_stats']
 
+            # Get bankroll info from database
+            db_strategy = self.state_manager.get_strategy_by_id(stats['strategy_id'])
+            initial_bankroll = db_strategy.initial_bankroll if db_strategy else 10000.0
+            current_bankroll = db_strategy.current_bankroll if db_strategy else 10000.0
+            bankroll_pnl = current_bankroll - initial_bankroll
+            bankroll_pct = (bankroll_pnl / initial_bankroll * 100) if initial_bankroll > 0 else 0
+
             # Basic stats
             logger.info(f"Strategy: {stats['strategy_name']}")
             logger.info(
                 f"  Candles: {stats['candles_processed']} | "
                 f"Signals: {stats['signals_generated']} | "
                 f"Trades: {stats['trades_executed']}"
+            )
+
+            # Bankroll stats
+            logger.info("")
+            logger.info("  Bankroll:")
+            status = "ACTIVE" if current_bankroll > 0 else "DEPLETED"
+            logger.info(
+                f"    ${current_bankroll:,.2f} ({bankroll_pnl:+,.2f} / {bankroll_pct:+.1f}%) [{status}]"
             )
 
             # Performance stats

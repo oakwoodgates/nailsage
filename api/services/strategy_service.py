@@ -54,6 +54,8 @@ class StrategyService:
                     interval=row["interval"],
                     model_id=row["model_id"],
                     is_active=bool(row["is_active"]),
+                    initial_bankroll=float(row["initial_bankroll"]) if row.get("initial_bankroll") else 10000.0,
+                    current_bankroll=float(row["current_bankroll"]) if row.get("current_bankroll") else 10000.0,
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
                 ))
@@ -81,9 +83,21 @@ class StrategyService:
             interval=strategy.interval,
             model_id=strategy.model_id,
             is_active=strategy.is_active,
+            initial_bankroll=strategy.initial_bankroll,
+            current_bankroll=strategy.current_bankroll,
             created_at=strategy.created_at,
             updated_at=strategy.updated_at,
         )
+
+    def update_strategy_bankroll(self, strategy_id: int, new_bankroll: float) -> None:
+        """Update strategy bankroll.
+
+        Args:
+            strategy_id: Strategy ID
+            new_bankroll: New bankroll value (USDT)
+        """
+        self.state_manager.update_strategy_bankroll(strategy_id, new_bankroll)
+        logger.info(f"Updated strategy {strategy_id} bankroll to ${new_bankroll:.2f}")
 
     def get_strategy_with_stats(
         self,
@@ -165,6 +179,8 @@ class StrategyService:
             interval=strategy.interval,
             model_id=strategy.model_id,
             is_active=strategy.is_active,
+            initial_bankroll=strategy.initial_bankroll,
+            current_bankroll=strategy.current_bankroll,
             created_at=strategy.created_at,
             updated_at=strategy.updated_at,
             total_trades=total_trades,

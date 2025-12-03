@@ -16,6 +16,8 @@ class StrategyBase(BaseModel):
     interval: str = Field(description="Trading interval (1m, 15m, 4h, etc.)")
     model_id: Optional[str] = Field(None, description="ML model identifier")
     is_active: bool = Field(default=True, description="Whether strategy is active")
+    initial_bankroll: float = Field(default=10000.0, description="Initial capital for this strategy (USDT)")
+    current_bankroll: float = Field(default=10000.0, description="Current capital after P&L (USDT)")
 
 
 class StrategyResponse(StrategyBase, TimestampMixin):
@@ -55,3 +57,21 @@ class StrategyListResponse(BaseModel):
 
     strategies: List[StrategyResponse] = Field(description="List of strategies")
     total: int = Field(description="Total number of strategies")
+
+
+class BankrollResponse(BaseModel):
+    """Response for bankroll endpoint."""
+
+    strategy_id: int = Field(description="Strategy ID")
+    strategy_name: str = Field(description="Strategy name")
+    initial_bankroll: float = Field(description="Initial capital (USDT)")
+    current_bankroll: float = Field(description="Current capital after P&L (USDT)")
+    pnl: float = Field(description="Total P&L (current - initial)")
+    pnl_pct: float = Field(description="P&L percentage")
+    is_active: bool = Field(description="Whether strategy can trade (bankroll > 0)")
+
+
+class BankrollUpdateRequest(BaseModel):
+    """Request to update strategy bankroll."""
+
+    bankroll: float = Field(description="New bankroll value (USDT)", gt=0)

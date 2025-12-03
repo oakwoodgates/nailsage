@@ -43,6 +43,8 @@ class Strategy:
     model_id: Optional[str] = None
     config_path: Optional[str] = None
     is_active: bool = True
+    initial_bankroll: float = 10000.0  # Starting capital for this strategy (USDT)
+    current_bankroll: float = 10000.0  # Current capital after P&L (USDT)
     created_at: Optional[int] = None
     updated_at: Optional[int] = None
 
@@ -289,9 +291,10 @@ class StateManager:
                     text("""
                         INSERT INTO strategies
                         (strategy_name, version, starlisting_id, interval, model_id, config_path,
-                         is_active, created_at, updated_at)
+                         is_active, initial_bankroll, current_bankroll, created_at, updated_at)
                         VALUES (:strategy_name, :version, :starlisting_id, :interval, :model_id,
-                                :config_path, :is_active, :created_at, :updated_at)
+                                :config_path, :is_active, :initial_bankroll, :current_bankroll,
+                                :created_at, :updated_at)
                         RETURNING id
                     """),
                     {
@@ -302,6 +305,8 @@ class StateManager:
                         "model_id": strategy.model_id,
                         "config_path": strategy.config_path,
                         "is_active": strategy.is_active,
+                        "initial_bankroll": strategy.initial_bankroll,
+                        "current_bankroll": strategy.current_bankroll,
                         "created_at": now,
                         "updated_at": now,
                     },
@@ -315,7 +320,8 @@ class StateManager:
                         UPDATE strategies
                         SET strategy_name = :strategy_name, version = :version, starlisting_id = :starlisting_id,
                             interval = :interval, model_id = :model_id, config_path = :config_path,
-                            is_active = :is_active, updated_at = :updated_at
+                            is_active = :is_active, initial_bankroll = :initial_bankroll,
+                            current_bankroll = :current_bankroll, updated_at = :updated_at
                         WHERE id = :id
                     """),
                     {
@@ -326,6 +332,8 @@ class StateManager:
                         "model_id": strategy.model_id,
                         "config_path": strategy.config_path,
                         "is_active": strategy.is_active,
+                        "initial_bankroll": strategy.initial_bankroll,
+                        "current_bankroll": strategy.current_bankroll,
                         "updated_at": now,
                         "id": strategy.id,
                     },
@@ -374,9 +382,38 @@ class StateManager:
             model_id=row["model_id"],
             config_path=row["config_path"],
             is_active=bool(row["is_active"]),
+            initial_bankroll=float(row["initial_bankroll"]) if row["initial_bankroll"] is not None else 10000.0,
+            current_bankroll=float(row["current_bankroll"]) if row["current_bankroll"] is not None else 10000.0,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+    def update_strategy_bankroll(self, strategy_id: int, new_bankroll: float) -> None:
+        """
+        Update current bankroll for a strategy after trade P&L.
+
+        Args:
+            strategy_id: Strategy ID
+            new_bankroll: New bankroll value (USDT)
+        """
+        now = int(datetime.now().timestamp() * 1000)
+        engine = self._get_engine()
+
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    UPDATE strategies
+                    SET current_bankroll = :new_bankroll, updated_at = :updated_at
+                    WHERE id = :strategy_id
+                """),
+                {
+                    "new_bankroll": new_bankroll,
+                    "updated_at": now,
+                    "strategy_id": strategy_id,
+                },
+            )
+
+        logger.info(f"Updated strategy {strategy_id} bankroll to ${new_bankroll:.2f}")
 
     # ========================================================================
     # Position Methods

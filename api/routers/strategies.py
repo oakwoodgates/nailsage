@@ -9,7 +9,13 @@ from api.dependencies import get_strategy_service, get_trade_service, get_positi
 from api.services.strategy_service import StrategyService
 from api.services.trade_service import TradeService
 from api.services.position_service import PositionService
-from api.schemas.strategies import StrategyResponse, StrategyWithStats, StrategyListResponse
+from api.schemas.strategies import (
+    StrategyResponse,
+    StrategyWithStats,
+    StrategyListResponse,
+    BankrollResponse,
+    BankrollUpdateRequest,
+)
 from api.schemas.trades import TradeListResponse
 from api.schemas.positions import PositionListResponse
 
@@ -148,4 +154,87 @@ async def get_strategy_positions(
         )
     except Exception as e:
         logger.error(f"Error getting positions for strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}/bankroll", response_model=BankrollResponse)
+async def get_strategy_bankroll(
+    strategy_id: int,
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """Get current bankroll for a strategy.
+
+    Args:
+        strategy_id: Strategy ID
+
+    Returns:
+        Bankroll details including current balance and P&L
+    """
+    try:
+        strategy = strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        pnl = strategy.current_bankroll - strategy.initial_bankroll
+        pnl_pct = (pnl / strategy.initial_bankroll * 100) if strategy.initial_bankroll > 0 else 0
+
+        return BankrollResponse(
+            strategy_id=strategy.id,
+            strategy_name=strategy.strategy_name,
+            initial_bankroll=strategy.initial_bankroll,
+            current_bankroll=strategy.current_bankroll,
+            pnl=pnl,
+            pnl_pct=pnl_pct,
+            is_active=strategy.current_bankroll > 0,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting bankroll for strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{strategy_id}/bankroll", response_model=BankrollResponse)
+async def update_strategy_bankroll(
+    strategy_id: int,
+    request: BankrollUpdateRequest,
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """Update/replenish strategy bankroll.
+
+    Use this endpoint to manually adjust a strategy's bankroll,
+    such as replenishing a depleted strategy.
+
+    Args:
+        strategy_id: Strategy ID
+        request: New bankroll value
+
+    Returns:
+        Updated bankroll details
+    """
+    try:
+        strategy = strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        # Update bankroll
+        strategy_service.update_strategy_bankroll(strategy_id, request.bankroll)
+
+        # Return updated values
+        pnl = request.bankroll - strategy.initial_bankroll
+        pnl_pct = (pnl / strategy.initial_bankroll * 100) if strategy.initial_bankroll > 0 else 0
+
+        return BankrollResponse(
+            strategy_id=strategy_id,
+            strategy_name=strategy.strategy_name,
+            initial_bankroll=strategy.initial_bankroll,
+            current_bankroll=request.bankroll,
+            pnl=pnl,
+            pnl_pct=pnl_pct,
+            is_active=request.bankroll > 0,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating bankroll for strategy {strategy_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
