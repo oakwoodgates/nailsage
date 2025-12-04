@@ -208,15 +208,43 @@ class StrategyService:
         Returns:
             Strategy with stats or None if not found
         """
-        strategy = self.state_manager.get_strategy_by_id(strategy_id)
-        if not strategy:
-            return None
-
         engine = self.state_manager._get_engine()
 
         from sqlalchemy import text
 
+        # Query strategy with LEFT JOIN to arenas for arena summary data
+        strategy_query = """
+            SELECT
+                s.*,
+                a.id as arena_db_id,
+                a.starlisting_id as arena_starlisting_id,
+                a.trading_pair,
+                a.interval as arena_interval,
+                c.symbol as coin,
+                c.name as coin_name,
+                q.symbol as quote,
+                q.name as quote_name,
+                e.slug as exchange,
+                e.display_name as exchange_name,
+                mt.type as market_type,
+                mt.display as market_name
+            FROM strategies s
+            LEFT JOIN arenas a ON s.arena_id = a.id
+            LEFT JOIN coins c ON a.coin_id = c.id
+            LEFT JOIN coins q ON a.quote_id = q.id
+            LEFT JOIN exchanges e ON a.exchange_id = e.id
+            LEFT JOIN market_types mt ON a.market_type_id = mt.id
+            WHERE s.id = :strategy_id
+        """
+
         with engine.connect() as conn:
+            # Get strategy with arena data
+            result = conn.execute(text(strategy_query), {"strategy_id": strategy_id})
+            strategy_row = result.mappings().fetchone()
+
+            if not strategy_row:
+                return None
+
             # Get trade counts and P&L metrics
             result = conn.execute(
                 text("""
@@ -249,6 +277,24 @@ class StrategyService:
             )
             open_row = result.mappings().fetchone()
 
+        # Build arena summary if arena_id exists
+        arena = None
+        if strategy_row.get("arena_id") and strategy_row.get("arena_db_id"):
+            arena = ArenaSummary(
+                id=strategy_row["arena_db_id"],
+                starlisting_id=strategy_row["arena_starlisting_id"],
+                trading_pair=strategy_row["trading_pair"],
+                interval=strategy_row["arena_interval"],
+                coin=strategy_row["coin"],
+                coin_name=strategy_row["coin_name"],
+                quote=strategy_row["quote"],
+                quote_name=strategy_row["quote_name"],
+                exchange=strategy_row["exchange"],
+                exchange_name=strategy_row["exchange_name"],
+                market_type=strategy_row["market_type"],
+                market_name=strategy_row["market_name"],
+            )
+
         # Calculate metrics
         total_trades = int(stats_row["total_trades"] or 0)
         win_count = int(stats_row["win_count"] or 0)
@@ -267,17 +313,19 @@ class StrategyService:
         profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else 0
 
         return StrategyWithStats(
-            id=strategy.id,
-            strategy_name=strategy.strategy_name,
-            version=strategy.version,
-            starlisting_id=strategy.starlisting_id,
-            interval=strategy.interval,
-            model_id=strategy.model_id,
-            is_active=strategy.is_active,
-            initial_bankroll=strategy.initial_bankroll,
-            current_bankroll=strategy.current_bankroll,
-            created_at=strategy.created_at,
-            updated_at=strategy.updated_at,
+            id=strategy_row["id"],
+            strategy_name=strategy_row["strategy_name"],
+            version=strategy_row["version"],
+            starlisting_id=strategy_row["starlisting_id"],
+            arena_id=strategy_row.get("arena_id"),
+            interval=strategy_row["interval"],
+            model_id=strategy_row["model_id"],
+            is_active=bool(strategy_row["is_active"]),
+            initial_bankroll=float(strategy_row["initial_bankroll"]) if strategy_row.get("initial_bankroll") else 10000.0,
+            current_bankroll=float(strategy_row["current_bankroll"]) if strategy_row.get("current_bankroll") else 10000.0,
+            created_at=strategy_row["created_at"],
+            updated_at=strategy_row["updated_at"],
+            arena=arena,
             total_trades=total_trades,
             open_positions=open_positions,
             total_pnl_usd=total_pnl,
