@@ -12,6 +12,7 @@ from api.services.trade_service import TradeService
 from api.services.position_service import PositionService
 from api.services.stats_service import StatsService
 from api.services.portfolio_service import PortfolioService
+from api.services.model_service import ModelService
 
 logger = logging.getLogger(__name__)
 
@@ -95,3 +96,12 @@ def get_portfolio_service() -> PortfolioService:
         get_state_manager(),
         initial_capital=config.initial_capital,
     )
+
+
+def get_model_service() -> ModelService:
+    """Get ModelService instance.
+
+    Returns:
+        ModelService for accessing model registry
+    """
+    return ModelService()

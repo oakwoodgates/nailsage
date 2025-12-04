@@ -5,10 +5,11 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.dependencies import get_strategy_service, get_trade_service, get_position_service
+from api.dependencies import get_strategy_service, get_trade_service, get_position_service, get_model_service
 from api.services.strategy_service import StrategyService
 from api.services.trade_service import TradeService
 from api.services.position_service import PositionService
+from api.services.model_service import ModelService
 from api.schemas.strategies import (
     StrategyResponse,
     StrategyWithStats,
@@ -18,6 +19,7 @@ from api.schemas.strategies import (
 )
 from api.schemas.trades import TradeListResponse
 from api.schemas.positions import PositionListResponse
+from api.schemas.models import ModelSummary, ModelListResponse
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +156,57 @@ async def get_strategy_positions(
         )
     except Exception as e:
         logger.error(f"Error getting positions for strategy {strategy_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_id}/models", response_model=ModelListResponse)
+async def get_strategy_models(
+    strategy_id: int,
+    strategy_service: StrategyService = Depends(get_strategy_service),
+    model_service: ModelService = Depends(get_model_service),
+):
+    """Get all models trained for a specific strategy.
+
+    Returns the training history for this strategy - all models that have
+    been trained, sorted by training date (newest first).
+
+    Args:
+        strategy_id: Strategy ID
+
+    Returns:
+        List of models trained for this strategy
+    """
+    try:
+        strategy = strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        # Get models for this strategy
+        # Extract the base strategy name from strategy_name (e.g., "sol_swing_momentum_v1" -> "sol_swing_momentum")
+        base_name = strategy.strategy_name
+        if base_name.endswith(f"_{strategy.version}"):
+            base_name = base_name[:-len(f"_{strategy.version}")]
+
+        models = model_service.get_models_for_strategy(base_name)
+
+        return ModelListResponse(
+            models=[
+                ModelSummary(
+                    model_id=m.model_id,
+                    strategy_name=m.strategy_name,
+                    model_type=m.model_type,
+                    version=m.version,
+                    trained_at=m.trained_at,
+                    validation_metrics=m.validation_metrics,
+                )
+                for m in models
+            ],
+            total=len(models),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting models for strategy {strategy_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from api.schemas.common import TimestampMixin
+from api.schemas.models import ModelSummary
 
 
 class StrategyBase(BaseModel):
@@ -50,6 +51,12 @@ class StrategyWithStats(StrategyResponse):
     avg_win_usd: float = Field(default=0.0, description="Average winning trade in USD")
     avg_loss_usd: float = Field(default=0.0, description="Average losing trade in USD")
     profit_factor: float = Field(default=0.0, description="Profit factor (gross profit / gross loss)")
+
+
+class StrategyWithModel(StrategyResponse):
+    """Strategy response with active model metadata embedded."""
+
+    model: Optional[ModelSummary] = Field(None, description="Active model for this strategy")
 
 
 class StrategyListResponse(BaseModel):

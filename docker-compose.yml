@@ -49,6 +49,7 @@ services:
       KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
     volumes:
       - ./logs:/app/logs
+      - ./models/metadata:/app/models/metadata:ro
     depends_on:
       postgres:
         condition: service_healthy
