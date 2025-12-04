@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from api.schemas.common import TimestampMixin
 from api.schemas.models import ModelSummary
+from api.schemas.arenas import ArenaSummary
 
 
 class StrategyBase(BaseModel):
@@ -14,6 +15,7 @@ class StrategyBase(BaseModel):
     strategy_name: str = Field(description="Strategy name")
     version: str = Field(description="Strategy version")
     starlisting_id: int = Field(description="Kirby starlisting ID")
+    arena_id: Optional[int] = Field(None, description="Arena ID (Nailsage internal)")
     interval: str = Field(description="Trading interval (1m, 15m, 4h, etc.)")
     model_id: Optional[str] = Field(None, description="ML model identifier")
     is_active: bool = Field(default=True, description="Whether strategy is active")
@@ -25,6 +27,7 @@ class StrategyResponse(StrategyBase, TimestampMixin):
     """Strategy response with all fields."""
 
     id: int = Field(description="Strategy ID")
+    arena: Optional[ArenaSummary] = Field(None, description="Arena metadata (if loaded)")
 
     model_config = {"from_attributes": True}
 

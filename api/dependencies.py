@@ -13,6 +13,7 @@ from api.services.position_service import PositionService
 from api.services.stats_service import StatsService
 from api.services.portfolio_service import PortfolioService
 from api.services.model_service import ModelService
+from api.services.arena_service import ArenaService
 
 logger = logging.getLogger(__name__)
 
@@ -105,3 +106,12 @@ def get_model_service() -> ModelService:
         ModelService for accessing model registry
     """
     return ModelService()
+
+
+def get_arena_service() -> ArenaService:
+    """Get ArenaService instance.
+
+    Returns:
+        ArenaService for arena and lookup table operations
+    """
+    return ArenaService(get_state_manager())

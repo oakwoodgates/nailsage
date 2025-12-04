@@ -11,6 +11,82 @@
 --   psql -U nailsage -d nailsage < execution/persistence/schema.postgres.sql
 
 -- ============================================================================
+-- Exchanges Lookup Table
+-- ============================================================================
+-- Normalized exchange data (e.g., "binance", "hyperliquid")
+
+CREATE TABLE IF NOT EXISTS exchanges (
+    id SERIAL PRIMARY KEY,
+    slug VARCHAR(50) NOT NULL UNIQUE,         -- e.g., "hyperliquid", "binance"
+    display_name VARCHAR(100) NOT NULL,       -- e.g., "Hyperliquid", "Binance"
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+);
+
+-- ============================================================================
+-- Coins Lookup Table
+-- ============================================================================
+-- Normalized coin/asset data (includes both base and quote assets)
+
+CREATE TABLE IF NOT EXISTS coins (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL UNIQUE,       -- e.g., "BTC", "USD", "USDT"
+    name VARCHAR(100) NOT NULL,               -- e.g., "Bitcoin", "US Dollar"
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+);
+
+-- ============================================================================
+-- Market Types Lookup Table
+-- ============================================================================
+-- Normalized market type data (e.g., "perps", "spot", "futures")
+
+CREATE TABLE IF NOT EXISTS market_types (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(20) NOT NULL UNIQUE,         -- e.g., "perps", "spot", "futures"
+    display VARCHAR(50) NOT NULL,             -- e.g., "Perpetuals", "Spot"
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+);
+
+-- ============================================================================
+-- Arenas Table
+-- ============================================================================
+-- Trading arenas representing unique (exchange, pair, interval) combinations
+-- Data synced from Kirby API starlistings
+
+CREATE TABLE IF NOT EXISTS arenas (
+    id SERIAL PRIMARY KEY,
+    starlisting_id INTEGER NOT NULL UNIQUE,   -- Kirby external ID
+
+    -- Trading pair info
+    trading_pair VARCHAR(50) NOT NULL,        -- e.g., "BTC/USD"
+    trading_pair_id INTEGER,                  -- Kirby trading_pair_id
+
+    -- Foreign keys to lookup tables
+    coin_id INTEGER NOT NULL REFERENCES coins(id),
+    quote_id INTEGER NOT NULL REFERENCES coins(id),
+    exchange_id INTEGER NOT NULL REFERENCES exchanges(id),
+    market_type_id INTEGER NOT NULL REFERENCES market_types(id),
+
+    -- Interval (not normalized - unique per arena)
+    interval VARCHAR(10) NOT NULL,            -- e.g., "15m"
+    interval_seconds INTEGER NOT NULL,        -- e.g., 900
+
+    -- Status & timestamps
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_synced_at BIGINT,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arenas_starlisting ON arenas(starlisting_id);
+CREATE INDEX IF NOT EXISTS idx_arenas_trading_pair ON arenas(trading_pair);
+CREATE INDEX IF NOT EXISTS idx_arenas_exchange ON arenas(exchange_id);
+CREATE INDEX IF NOT EXISTS idx_arenas_coin ON arenas(coin_id);
+CREATE INDEX IF NOT EXISTS idx_arenas_market_type ON arenas(market_type_id);
+
+-- ============================================================================
 -- Strategies Table
 -- ============================================================================
 
@@ -19,6 +95,7 @@ CREATE TABLE IF NOT EXISTS strategies (
     strategy_name VARCHAR(255) NOT NULL,
     version VARCHAR(50) NOT NULL,
     starlisting_id INTEGER NOT NULL,
+    arena_id INTEGER REFERENCES arenas(id),  -- Reference to arena (nullable for migration)
     interval VARCHAR(10) NOT NULL,
     model_id VARCHAR(255),  -- NailSage model ID (from model registry)
     config_path TEXT,  -- Path to strategy YAML config
@@ -33,6 +110,7 @@ CREATE TABLE IF NOT EXISTS strategies (
 
 CREATE INDEX IF NOT EXISTS idx_strategies_active ON strategies(is_active);
 CREATE INDEX IF NOT EXISTS idx_strategies_starlisting ON strategies(starlisting_id);
+CREATE INDEX IF NOT EXISTS idx_strategies_arena ON strategies(arena_id);
 
 -- ============================================================================
 -- Positions Table
