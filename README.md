@@ -29,6 +29,7 @@ NailSage is a production-ready ML trading research platform designed for buildin
 - **✅ Per-Strategy Bankroll**: Isolated $10k bankroll per strategy with percentage-based sizing
 - **✅ Automatic Position Sizing**: Trades sized at 10% of current strategy bankroll
 - **✅ Bankroll Depletion Protection**: Strategies auto-pause when bankroll <= $0
+- **✅ Arena Metadata**: Trading arena data (exchange, pair, interval) synced from Kirby API
 
 ## 🚀 Quick Start
 
@@ -152,7 +153,16 @@ nailsage/
 ├── strategies/                # Strategy implementations
 │   ├── short_term/           # Short-term strategies
 │   └── long_term/            # Long-term strategies
-├── tests/                     # Test suite (145 passing tests)
+├── api/                       # FastAPI REST/WebSocket API
+│   ├── routers/              # Endpoint routers
+│   │   ├── strategies.py     # Strategy management
+│   │   ├── arenas.py         # Arena metadata (exchange, pair, interval)
+│   │   ├── positions.py      # Position tracking
+│   │   └── trades.py         # Trade history
+│   ├── services/             # Business logic layer
+│   ├── schemas/              # Pydantic models
+│   └── websocket/            # Real-time updates
+├── tests/                     # Test suite
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
 └── scripts/                   # Training & utility scripts
@@ -227,9 +237,10 @@ assert lookback_window < split_start_timestamp
 **Ready to train your first model?** See [MODEL_TRAINING.md](docs/MODEL_TRAINING.md) for comprehensive training and validation guide.
 
 **Key Documentation**:
-- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - **NEW**: Training, validation, and backtesting guide
-- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide (legacy)
+- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - Training, validation, and backtesting guide
+- [docs/API.md](docs/API.md) - REST API reference (strategies, arenas, trades, positions)
 - [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment guide
+- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide (legacy)
 - [.claude/PROJECT_CONTEXT.md](.claude/PROJECT_CONTEXT.md) - Complete project overview
 - [.claude/STATUS.md](.claude/STATUS.md) - Current status and progress
 - [.claude/DECISIONS.md](.claude/DECISIONS.md) - Architectural Decision Records

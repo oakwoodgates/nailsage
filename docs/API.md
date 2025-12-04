@@ -67,13 +67,28 @@ List all strategies.
       "strategy_name": "btc_scalper",
       "version": "v1",
       "starlisting_id": 123,
+      "arena_id": 1,
       "interval": "15m",
       "model_id": "model_abc123",
       "is_active": true,
       "initial_bankroll": 10000.00,
       "current_bankroll": 9500.00,
       "created_at": 1700000000000,
-      "updated_at": 1700000000000
+      "updated_at": 1700000000000,
+      "arena": {
+        "id": 1,
+        "starlisting_id": 123,
+        "trading_pair": "BTC/USD",
+        "interval": "15m",
+        "coin": "BTC",
+        "coin_name": "Bitcoin",
+        "quote": "USD",
+        "quote_name": "US Dollar",
+        "exchange": "hyperliquid",
+        "exchange_name": "Hyperliquid",
+        "market_type": "perps",
+        "market_name": "Perpetuals"
+      }
     }
   ],
   "total": 1
@@ -91,13 +106,28 @@ Get strategy by ID.
   "strategy_name": "btc_scalper",
   "version": "v1",
   "starlisting_id": 123,
+  "arena_id": 1,
   "interval": "15m",
   "model_id": "model_abc123",
   "is_active": true,
   "initial_bankroll": 10000.00,
   "current_bankroll": 9500.00,
   "created_at": 1700000000000,
-  "updated_at": 1700000000000
+  "updated_at": 1700000000000,
+  "arena": {
+    "id": 1,
+    "starlisting_id": 123,
+    "trading_pair": "BTC/USD",
+    "interval": "15m",
+    "coin": "BTC",
+    "coin_name": "Bitcoin",
+    "quote": "USD",
+    "quote_name": "US Dollar",
+    "exchange": "hyperliquid",
+    "exchange_name": "Hyperliquid",
+    "market_type": "perps",
+    "market_name": "Perpetuals"
+  }
 }
 ```
 
@@ -206,6 +236,158 @@ Update/replenish strategy bankroll. Use this endpoint to manually adjust a strat
 curl -X PATCH http://localhost:8000/api/v1/strategies/1/bankroll \
   -H "Content-Type: application/json" \
   -d '{"bankroll": 10000.00}'
+```
+
+---
+
+### Arenas
+
+Trading arenas represent unique combinations of exchange, trading pair, and interval. Arena data is synced from the Kirby API and cached locally.
+
+#### GET /api/v1/arenas
+
+List all arenas.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| active_only | boolean | true | Filter to active arenas only |
+| exchange_id | integer | null | Filter by exchange ID |
+| coin_id | integer | null | Filter by coin (base asset) ID |
+
+**Response:**
+```json
+{
+  "arenas": [
+    {
+      "id": 1,
+      "starlisting_id": 123,
+      "trading_pair": "BTC/USD",
+      "trading_pair_id": 1,
+      "coin": {
+        "id": 1,
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "quote": {
+        "id": 2,
+        "symbol": "USD",
+        "name": "US Dollar"
+      },
+      "exchange": {
+        "id": 1,
+        "slug": "hyperliquid",
+        "name": "Hyperliquid"
+      },
+      "market_type": {
+        "id": 1,
+        "type": "perps",
+        "name": "Perpetuals"
+      },
+      "interval": "15m",
+      "interval_seconds": 900,
+      "is_active": true,
+      "last_synced_at": 1700000000000,
+      "created_at": 1700000000000,
+      "updated_at": 1700000000000
+    }
+  ],
+  "total": 1
+}
+```
+
+#### GET /api/v1/arenas/{id}
+
+Get arena by ID.
+
+**Response:** Same structure as arena object above.
+
+#### GET /api/v1/arenas/by-starlisting/{starlisting_id}
+
+Get arena by Kirby starlisting ID.
+
+**Response:** Same structure as arena object above.
+
+#### POST /api/v1/arenas/sync
+
+Sync arena metadata from Kirby API. Creates or updates local arena record.
+
+**Request Body:**
+```json
+{
+  "starlisting_id": 123
+}
+```
+
+**Response:**
+```json
+{
+  "arena": { ... },
+  "created": true
+}
+```
+
+---
+
+### Lookup Tables
+
+#### GET /api/v1/exchanges
+
+List all exchanges.
+
+**Response:**
+```json
+{
+  "exchanges": [
+    {
+      "id": 1,
+      "slug": "hyperliquid",
+      "name": "Hyperliquid"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### GET /api/v1/coins
+
+List all coins/assets.
+
+**Response:**
+```json
+{
+  "coins": [
+    {
+      "id": 1,
+      "symbol": "BTC",
+      "name": "Bitcoin"
+    },
+    {
+      "id": 2,
+      "symbol": "USD",
+      "name": "US Dollar"
+    }
+  ],
+  "total": 2
+}
+```
+
+#### GET /api/v1/market-types
+
+List all market types.
+
+**Response:**
+```json
+{
+  "market_types": [
+    {
+      "id": 1,
+      "type": "perps",
+      "name": "Perpetuals"
+    }
+  ],
+  "total": 1
+}
 ```
 
 ---
