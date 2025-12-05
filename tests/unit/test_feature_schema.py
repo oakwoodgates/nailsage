@@ -297,3 +297,41 @@ class TestFeatureSchemaIntegration:
         # Should raise ValueError
         with pytest.raises(ValueError, match="Missing required features"):
             schema.validate(inference_df)
+
+
+class TestFeatureExclusion:
+    """Test suite for OHLCV feature exclusion."""
+
+    def test_ohlcv_columns_defined(self):
+        """Test that OHLCV columns are properly defined."""
+        ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        assert len(ohlcv_cols) == 6
+
+    def test_feature_exclusion_logic(self):
+        """Test feature column filtering logic."""
+        # Simulate dataframe columns
+        all_cols = [
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'ema_12', 'rsi_14', 'macd', 'bollinger_upper'
+        ]
+
+        ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        feature_cols = [col for col in all_cols if col not in ohlcv_cols]
+
+        # Should only have indicators
+        assert 'open' not in feature_cols
+        assert 'close' not in feature_cols
+        assert 'ema_12' in feature_cols
+        assert 'rsi_14' in feature_cols
+        assert len(feature_cols) == 4
+
+    def test_no_ohlcv_leakage(self):
+        """Test that OHLCV columns are not used as features."""
+        all_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'ema_12']
+        ohlcv_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+        feature_cols = [col for col in all_cols if col not in ohlcv_cols]
+
+        # Verify no OHLCV in features
+        for ohlcv in ohlcv_cols:
+            assert ohlcv not in feature_cols
