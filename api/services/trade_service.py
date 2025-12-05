@@ -47,10 +47,11 @@ class TradeService:
 
             if strategy_id:
                 query = """
-                    SELECT t.*, s.strategy_name, p.side as position_side
+                    SELECT t.*, s.strategy_name, p.side as position_side, a.id as arena_id
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
+                    LEFT JOIN arenas a ON t.starlisting_id = a.starlisting_id
                     WHERE t.strategy_id = :strategy_id
                     ORDER BY t.timestamp DESC, t.id DESC
                     LIMIT :limit OFFSET :offset
@@ -59,10 +60,11 @@ class TradeService:
                 params["strategy_id"] = strategy_id
             else:
                 query = """
-                    SELECT t.*, s.strategy_name, p.side as position_side
+                    SELECT t.*, s.strategy_name, p.side as position_side, a.id as arena_id
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
+                    LEFT JOIN arenas a ON t.starlisting_id = a.starlisting_id
                     ORDER BY t.timestamp DESC, t.id DESC
                     LIMIT :limit OFFSET :offset
                 """
@@ -90,6 +92,7 @@ class TradeService:
                     created_at=row["created_at"],
                     strategy_name=row["strategy_name"],
                     position_side=row["position_side"],
+                    arena_id=row.get("arena_id"),
                 ))
 
         return TradeListResponse(
@@ -115,10 +118,11 @@ class TradeService:
         with engine.connect() as conn:
             result = conn.execute(
                 text("""
-                    SELECT t.*, s.strategy_name, p.side as position_side
+                    SELECT t.*, s.strategy_name, p.side as position_side, a.id as arena_id
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
+                    LEFT JOIN arenas a ON t.starlisting_id = a.starlisting_id
                     WHERE t.id = :trade_id
                 """),
                 {"trade_id": trade_id}
@@ -143,6 +147,7 @@ class TradeService:
             created_at=row["created_at"],
             strategy_name=row["strategy_name"],
             position_side=row["position_side"],
+            arena_id=row.get("arena_id"),
         )
 
     def get_recent_trades(self, limit: int = 10) -> List[TradeResponse]:
@@ -185,10 +190,11 @@ class TradeService:
 
             if strategy_id:
                 query = """
-                    SELECT t.*, s.strategy_name, p.side as position_side
+                    SELECT t.*, s.strategy_name, p.side as position_side, a.id as arena_id
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
+                    LEFT JOIN arenas a ON t.starlisting_id = a.starlisting_id
                     WHERE t.timestamp >= :start_ts AND t.timestamp <= :end_ts
                     AND t.strategy_id = :strategy_id
                     ORDER BY t.timestamp DESC, t.id DESC
@@ -196,10 +202,11 @@ class TradeService:
                 params["strategy_id"] = strategy_id
             else:
                 query = """
-                    SELECT t.*, s.strategy_name, p.side as position_side
+                    SELECT t.*, s.strategy_name, p.side as position_side, a.id as arena_id
                     FROM trades t
                     LEFT JOIN strategies s ON t.strategy_id = s.id
                     LEFT JOIN positions p ON t.position_id = p.id
+                    LEFT JOIN arenas a ON t.starlisting_id = a.starlisting_id
                     WHERE t.timestamp >= :start_ts AND t.timestamp <= :end_ts
                     ORDER BY t.timestamp DESC, t.id DESC
                 """
@@ -222,6 +229,7 @@ class TradeService:
                     created_at=row["created_at"],
                     strategy_name=row["strategy_name"],
                     position_side=row["position_side"],
+                    arena_id=row.get("arena_id"),
                 ))
 
         return trades
