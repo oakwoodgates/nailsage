@@ -26,7 +26,7 @@ from execution.inference.predictor import ModelPredictor
 from execution.inference.signal_generator import SignalGenerator, SignalGeneratorConfig
 from features.engine import FeatureEngine
 from models.registry import ModelMetadata, ModelRegistry
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
 from training.targets import create_binary_target
 
 

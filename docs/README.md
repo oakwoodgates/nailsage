@@ -125,7 +125,7 @@
 ### For Architecture Understanding
 1. Read [DECISIONS.md](DECISIONS.md) - Understand key design choices
 2. Review [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - See project structure
-3. Check code in relevant modules (`features/`, `validation/`, `portfolio/`)
+3. Check code in relevant modules (`features/`, `training/validation/`, `execution/portfolio/`)
 
 ---
 
@@ -193,7 +193,7 @@ Benefits:
 - `features/` - Feature engineering, indicators
 - `validation/` - Walk-forward, backtesting, metrics
 - `models/` - Model registry, metadata, trained artifacts
-- `portfolio/` - Coordinator, positions, signals
+- `execution/portfolio/` - Coordinator, positions, signals
 - `strategies/` - Training and validation scripts
 - `utils/` - Logging, helpers
 

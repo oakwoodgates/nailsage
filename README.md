@@ -159,6 +159,10 @@ nailsage/
 │   │   ├── test_websocket_integration.py # WebSocket testing
 │   │   ├── test_signal_save.py # Signal testing
 │   │   └── debug_kirby_messages.py # Kirby debugging
+│   ├── portfolio/            # Portfolio coordination & signals
+│   │   ├── coordinator.py    # PortfolioCoordinator class
+│   │   ├── position.py       # Position tracking
+│   │   └── signal.py         # StrategySignal class
 │   ├── inference/            # Model inference for live trading
 │   ├── persistence/          # Database state management
 │   ├── risk/                 # Risk management

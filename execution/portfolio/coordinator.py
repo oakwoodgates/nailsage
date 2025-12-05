@@ -8,8 +8,8 @@ attempting to optimize or coordinate between strategies.
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from portfolio.position import Position
-from portfolio.signal import StrategySignal
+from execution.portfolio.position import Position
+from execution.portfolio.signal import StrategySignal
 from utils.logger import get_logger
 
 logger = get_logger("portfolio.coordinator")

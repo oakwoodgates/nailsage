@@ -8,9 +8,9 @@ Phase 1: Simple pass-through coordinator with basic safety checks
 Phase 2: Advanced coordination with portfolio optimization
 """
 
-from portfolio.coordinator import PortfolioCoordinator
-from portfolio.position import Position
-from portfolio.signal import StrategySignal
+from execution.portfolio.coordinator import PortfolioCoordinator
+from execution.portfolio.position import Position
+from execution.portfolio.signal import StrategySignal
 
 __all__ = [
     "PortfolioCoordinator",

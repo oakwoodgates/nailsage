@@ -50,7 +50,7 @@ from datetime import datetime
 from typing import Optional
 
 from execution.inference.predictor import Prediction
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
 from training.signal_pipeline import SignalPipeline
 
 logger = logging.getLogger(__name__)

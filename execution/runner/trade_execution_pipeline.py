@@ -16,7 +16,7 @@ from execution.inference.signal_generator import SignalGenerator
 from execution.persistence.state_manager import StateManager, Signal as SignalRecord, Position
 from execution.simulator.order_executor import OrderExecutor
 from execution.tracking.position_tracker import PositionTracker
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
 
 logger = logging.getLogger(__name__)
 

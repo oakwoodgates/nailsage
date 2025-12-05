@@ -5,7 +5,7 @@ from datetime import datetime
 
 from execution.inference.signal_generator import SignalGenerator, SignalGeneratorConfig
 from execution.inference.predictor import Prediction
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
 
 
 class TestSignalGeneratorConfig:
