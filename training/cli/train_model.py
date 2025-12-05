@@ -2,13 +2,13 @@
 
 Usage:
     # Train and validate (default - saves results to JSON)
-    python training/cli/train_model.py --config strategy-configs/dev_scalper_1m_v1.yaml
+    python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml
 
     # Train only (no validation)
-    python training/cli/train_model.py --config strategy-configs/dev_scalper_1m_v1.yaml --train-only
+    python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml --train-only
 
     # Train and validate without saving JSON
-    python training/cli/train_model.py --config strategy-configs/dev_scalper_1m_v1.yaml --no-json
+    python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml --no-json
 """
 
 import argparse

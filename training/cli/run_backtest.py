@@ -2,10 +2,10 @@
 
 Usage:
     # Run backtest (default - saves results to JSON)
-    python training/cli/run_backtest.py --config strategy-configs/dev_scalper_1m_v1.yaml --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
+    python training/cli/run_backtest.py --config strategies/dev_scalper_1m_v1.yaml --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 
     # Run backtest without saving JSON
-    python training/cli/run_backtest.py --config strategy-configs/dev_scalper_1m_v1.yaml --model-id MODEL_ID --no-json
+    python training/cli/run_backtest.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID --no-json
 """
 
 import argparse

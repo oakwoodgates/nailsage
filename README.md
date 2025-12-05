@@ -61,13 +61,13 @@ python scripts/generate_data_metadata.py --dir data/raw
 
 ```bash
 # Train with walk-forward validation (saves results to JSON)
-python training/cli/train_model.py --config strategy-configs/dev_scalper_1m_v1.yaml
+python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml
 
 # Validate existing model
-python training/cli/validate_model.py --config strategy-configs/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/validate_model.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 
 # Quick backtest
-python training/cli/run_backtest.py --config strategy-configs/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/run_backtest.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 ```
 
 ### Run Tests
@@ -130,7 +130,7 @@ nailsage/
 │   ├── backtest.py           # BacktestConfig (fees, slippage)
 │   └── risk.py               # RiskConfig (position sizing)
 ├── configs/                   # Default configuration files
-├── strategy-configs/          # Strategy YAML configs (not versioned)
+├── strategies/          # Strategy YAML configs (not versioned)
 ├── data/                      # Data management
 │   ├── loader.py             # Load OHLCV data (Parquet/CSV)
 │   ├── validator.py          # Data quality validation

@@ -106,7 +106,7 @@ All models use the **same training infrastructure** with strategy-specific YAML 
 | [training/cli/validate_model.py](../training/cli/validate_model.py) | Standalone validation |
 | [training/cli/run_backtest.py](../training/cli/run_backtest.py) | Quick backtesting |
 
-**Configuration**: `strategy-configs/*.yaml`
+**Configuration**: `strategies/*.yaml`
 
 **Benefits**:
 - One bug fix benefits all strategies
@@ -129,7 +129,7 @@ These are kept for reference but **should not be used for new strategies**.
 
 ```
 nailsage/
-├── strategy-configs/         # Strategy YAML configs (✅ ACTIVE)
+├── strategies/         # Strategy YAML configs (✅ ACTIVE)
 ├── execution/
 │   ├── runner/
 │   │   ├── live_strategy.py   # Main orchestrator (✅ ACTIVE)
@@ -167,7 +167,7 @@ nailsage/
 
 ### "I need to add a new strategy" → What do I do?
 
-1. Create YAML config in `strategy-configs/my_strategy_v1.yaml`
+1. Create YAML config in `strategies/my_strategy_v1.yaml`
 2. Train: `python training/cli/train_model.py --config configs/strategies/my_strategy_v1.yaml`
 3. Deploy: Update `docker-compose.yml` environment variables
 4. See [MODEL_TRAINING.md](MODEL_TRAINING.md) for details

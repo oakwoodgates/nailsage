@@ -11,7 +11,7 @@ This script validates trained models using walk-forward methodology with:
 
 Usage:
     python scripts/validate_model.py \\
-        --config strategy-configs/dev_scalper_1m_v1.yaml \\
+        --config strategies/dev_scalper_1m_v1.yaml \\
         --model-id 33b9a1937aacaa4d_20251126_152519_f8835d \\
         --retrain  # optional: retrain model on each split
 """
