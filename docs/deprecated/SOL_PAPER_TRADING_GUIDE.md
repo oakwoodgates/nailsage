@@ -212,7 +212,7 @@ grep "confidence" execution/logs/paper_trading.log | tail -20
 ```bash
 # Train the SOL swing model
 python strategies/short_term/train_momentum_classifier.py \
-    --config configs/strategies/sol_swing_momentum_v1.yaml
+    --config strategy-configs/sol_swing_momentum_v1.yaml
 ```
 
 ## Production Readiness

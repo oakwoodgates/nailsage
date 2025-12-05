@@ -16,16 +16,16 @@ All scripts are **configuration-driven** - strategy differences are captured in 
 
 ```bash
 # Train with walk-forward validation (saves results to JSON)
-python training/cli/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
+python training/cli/train_model.py --config strategy-configs/dev_scalper_1m_v1.yaml
 
 # Validate existing model
 python training/cli/validate_model.py \
-    --config configs/strategies/dev_scalper_1m_v1.yaml \
+    --config strategy-configs/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 
 # Quick backtest
 python training/cli/run_backtest.py \
-    --config configs/strategies/dev_scalper_1m_v1.yaml \
+    --config strategy-configs/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 ```
 
@@ -48,13 +48,13 @@ python training/cli/run_backtest.py \
 
 ```bash
 # Train and validate (default)
-python scripts/train_model.py --config configs/strategies/your_strategy.yaml
+python scripts/train_model.py --config strategy-configs/your_strategy.yaml
 
 # Train only, skip validation
-python scripts/train_model.py --config configs/strategies/your_strategy.yaml --train-only
+python scripts/train_model.py --config strategy-configs/your_strategy.yaml --train-only
 
 # Train without saving JSON results
-python scripts/train_model.py --config configs/strategies/your_strategy.yaml --no-json
+python scripts/train_model.py --config strategy-configs/your_strategy.yaml --no-json
 ```
 
 **What It Does**:
@@ -111,12 +111,12 @@ Results saved to: results/training/dev_scalper_1m_v1_20251126_152519.json
 ```bash
 # Validate existing model
 python scripts/validate_model.py \
-    --config configs/strategies/dev_scalper_1m_v1.yaml \
+    --config strategy-configs/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 
 # Validate with model retraining per split (true walk-forward)
 python scripts/validate_model.py \
-    --config configs/strategies/dev_scalper_1m_v1.yaml \
+    --config strategy-configs/dev_scalper_1m_v1.yaml \
     --model-id MODEL_ID \
     --retrain
 
@@ -176,7 +176,7 @@ Results saved to: results/validation/dev_scalper_1m_v1_20251126_174211.json
 ```bash
 # Run backtest
 python scripts/run_backtest.py \
-    --config configs/strategies/dev_scalper_1m_v1.yaml \
+    --config strategy-configs/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 
 # Run without saving JSON
@@ -246,7 +246,7 @@ Results saved to: results/backtest/dev_scalper_1m_v1_20251126_180145.json
 
 ## 🔧 Strategy Configuration
 
-All scripts use the same YAML configuration format. See `configs/strategies/dev_scalper_1m_v1.yaml` for a complete example.
+All scripts use the same YAML configuration format. See `strategy-configs/dev_scalper_1m_v1.yaml` for a complete example.
 
 ### Key Configuration Sections
 
@@ -420,10 +420,10 @@ results/
 ### 1. Train New Model
 
 ```bash
-# Create config file: configs/strategies/my_strategy_v1.yaml
+# Create config file: strategy-configs/my_strategy_v1.yaml
 
 # Train with validation
-python scripts/train_model.py --config configs/strategies/my_strategy_v1.yaml
+python scripts/train_model.py --config strategy-configs/my_strategy_v1.yaml
 
 # Note the model ID from output
 # Model ID: abc123_20251126_120000_xyz789
@@ -434,7 +434,7 @@ python scripts/train_model.py --config configs/strategies/my_strategy_v1.yaml
 ```bash
 # Run standalone validation
 python scripts/validate_model.py \
-    --config configs/strategies/my_strategy_v1.yaml \
+    --config strategy-configs/my_strategy_v1.yaml \
     --model-id abc123_20251126_120000_xyz789
 
 # Check results
@@ -446,7 +446,7 @@ cat results/validation/my_strategy_v1_20251126_120530.json
 ```bash
 # Fast single-period backtest
 python scripts/run_backtest.py \
-    --config configs/strategies/my_strategy_v1.yaml \
+    --config strategy-configs/my_strategy_v1.yaml \
     --model-id abc123_20251126_120000_xyz789
 ```
 
@@ -454,14 +454,14 @@ python scripts/run_backtest.py \
 
 ```bash
 # 1. Create multiple config files with different hyperparameters
-configs/strategies/my_strategy_v1_hp1.yaml  # max_depth=5
-configs/strategies/my_strategy_v1_hp2.yaml  # max_depth=7
-configs/strategies/my_strategy_v1_hp3.yaml  # max_depth=10
+strategy-configs/my_strategy_v1_hp1.yaml  # max_depth=5
+strategy-configs/my_strategy_v1_hp2.yaml  # max_depth=7
+strategy-configs/my_strategy_v1_hp3.yaml  # max_depth=10
 
 # 2. Train all variants
-python scripts/train_model.py --config configs/strategies/my_strategy_v1_hp1.yaml
-python scripts/train_model.py --config configs/strategies/my_strategy_v1_hp2.yaml
-python scripts/train_model.py --config configs/strategies/my_strategy_v1_hp3.yaml
+python scripts/train_model.py --config strategy-configs/my_strategy_v1_hp1.yaml
+python scripts/train_model.py --config strategy-configs/my_strategy_v1_hp2.yaml
+python scripts/train_model.py --config strategy-configs/my_strategy_v1_hp3.yaml
 
 # 3. Compare JSON results
 python -c "
@@ -540,7 +540,7 @@ target:
 - **Features**: See `features/indicators/` for available technical indicators
 - **Validation**: See `validation/` for validation framework details
 - **Registry**: See `models/registry.py` for model management
-- **Examples**: See `configs/strategies/` for example configurations
+- **Examples**: See `strategy-configs/` for example configurations
 
 ---
 

@@ -39,7 +39,7 @@ Before implementing a strategy, ensure you have:
 
 ### Step 1: Create Strategy Configuration
 
-Create `configs/strategies/momentum_classifier_v1.yaml`:
+Create `strategy-configs/momentum_classifier_v1.yaml`:
 
 ```yaml
 # Strategy metadata
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/strategies/momentum_classifier_v1.yaml",
+        default="strategy-configs/momentum_classifier_v1.yaml",
         help="Path to strategy configuration file"
     )
 
@@ -372,7 +372,7 @@ if __name__ == "__main__":
 ```bash
 # Train the strategy
 python strategies/short_term/train_momentum_classifier.py \\
-    --config configs/strategies/momentum_classifier_v1.yaml
+    --config strategy-configs/momentum_classifier_v1.yaml
 ```
 
 **Expected Output**:

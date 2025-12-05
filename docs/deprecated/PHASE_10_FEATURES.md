@@ -46,7 +46,7 @@ target = create_binary_target(
 
 ### Configuration Example
 
-From [configs/strategies/sol_swing_momentum_v1.yaml](../configs/strategies/sol_swing_momentum_v1.yaml):
+From [strategy-configs/sol_swing_momentum_v1.yaml](../strategy-configs/sol_swing_momentum_v1.yaml):
 
 ```yaml
 target:
@@ -187,7 +187,7 @@ bars_elapsed = 4 → ALLOWED
 
 ### Configuration Example
 
-From [configs/strategies/sol_swing_momentum_v1.yaml](../configs/strategies/sol_swing_momentum_v1.yaml):
+From [strategy-configs/sol_swing_momentum_v1.yaml](../strategy-configs/sol_swing_momentum_v1.yaml):
 
 ```yaml
 signal_generation:
@@ -549,7 +549,7 @@ print("="*60)
 Complete YAML configuration using all Phase 10 features:
 
 ```yaml
-# configs/strategies/phase10_example.yaml
+# strategy-configs/phase10_example.yaml
 
 strategy:
   name: phase10_complete
@@ -677,7 +677,7 @@ For implementation details, see [docs/PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 ## Support
 
 - Tests: [tests/unit/test_phase10_features.py](../tests/unit/test_phase10_features.py)
-- Config examples: [configs/strategies/](../configs/strategies/)
+- Config examples: [strategy-configs/](../strategy-configs/)
 - Implementation: [strategies/short_term/](../strategies/short_term/)
 
 For questions or issues, refer to the project documentation or test suite for working examples.

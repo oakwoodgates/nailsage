@@ -93,8 +93,7 @@ nailsage/                      # Project root
 │   ├── backtest.py           # BacktestConfig (fees, slippage)
 │   └── risk.py               # RiskConfig (position sizing, limits)
 ├── configs/                   # Configuration files (YAML)
-│   ├── btc_spot_short_term.yaml
-│   ├── backtest_default.yaml
+│   │   ├── backtest_default.yaml
 │   └── risk_default.yaml
 ├── data/                      # Data loading code + storage
 │   ├── loader.py             # DataLoader class
