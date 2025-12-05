@@ -14,6 +14,7 @@ from models.feature_schema import FeatureSchema
 from training.data_pipeline import DataPipeline
 from training.signal_pipeline import SignalPipeline
 from training.validation.backtest import BacktestEngine
+from utils.determinism import set_random_seeds, validate_config_consistency
 from utils.logger import get_training_logger
 
 logger = get_training_logger()
@@ -44,6 +45,7 @@ class BacktestPipeline:
         Args:
             config: Strategy configuration
         """
+        validate_config_consistency(config)
         self.config = config
         self.data_pipeline = DataPipeline(config)
         self.signal_pipeline = SignalPipeline(config)
@@ -66,6 +68,7 @@ class BacktestPipeline:
             Backtest results dictionary
         """
         logger.info(f"Starting backtest for model {model_id}")
+        set_random_seeds(getattr(self.config, "random_seed", 42))
 
         # Load model and metadata
         model, metadata = self._load_model_and_metadata(model_id)
@@ -143,7 +146,7 @@ class BacktestPipeline:
 
     def _process_signals(self, predictions, probabilities):
         """Process predictions into trading signals."""
-        num_classes = self.config.target.classes or 3
+        num_classes = self._resolve_num_classes()
 
         signals = self.signal_pipeline.process_signals_for_backtest(
             predictions, probabilities, num_classes
@@ -169,6 +172,11 @@ class BacktestPipeline:
             slippage_bps=self.config.backtest.slippage_bps,
             enable_leverage=self.config.backtest.leverage > 1,
             max_leverage=float(self.config.backtest.leverage),
+            max_position_size=getattr(self.config.backtest, 'max_position_size', 1.0),
+            funding_rate_annual=getattr(self.config.backtest, 'funding_rate_annual', 0.0),
+            fill_assumption=getattr(self.config.backtest, 'fill_assumption', 'close'),
+            assume_maker=getattr(self.config.backtest, 'assume_maker', False),
+            maker_fee=getattr(self.config.backtest, 'maker_fee', 0.0002),
         )
 
     def _run_backtest_execution(
@@ -296,3 +304,20 @@ class BacktestPipeline:
         print(f"Calmar Ratio: {metrics['calmar_ratio']:.2f}")
 
         print("="*70)
+
+    def _resolve_num_classes(self) -> int:
+        """Determine number of classes from target configuration."""
+        target_type = getattr(self.config.target, "type", "").lower()
+        explicit_classes = getattr(self.config.target, "classes", None)
+
+        if explicit_classes:
+            return explicit_classes
+
+        if target_type in ("binary", "2class", "classification_2class"):
+            return 2
+        if target_type in ("", "3class", "classification_3class", "classification"):
+            return 3
+        if target_type == "regression":
+            raise ValueError("Regression targets are not supported in backtest pipeline.")
+
+        raise ValueError(f"Unsupported target type '{target_type}'")

@@ -56,6 +56,9 @@ class SignalPipeline:
         Returns:
             Trading signals (-1=short, 0=neutral, 1=long)
         """
+        if num_classes not in (2, 3):
+            raise ValueError(f"Unsupported num_classes '{num_classes}' for signal conversion.")
+
         signals = np.zeros_like(predictions, dtype=int)
 
         # Map predictions to signals based on number of classes

@@ -116,24 +116,36 @@ class DataPipeline:
         return resampled
 
     def _create_target_variable(self, df: pd.DataFrame) -> pd.Series:
-        """Create target variable for classification."""
+        """Create target variable based on configured target type."""
+        target_type = getattr(self.config.target, "type", None)
         num_classes = self.config.target.classes or 3
-        logger.info(f"Creating {num_classes}-class target variable...")
 
-        if num_classes == 2:
-            target_series = create_binary_target(
+        # Normalize target type for compatibility
+        target_type_normalized = (target_type or "").lower()
+        if target_type_normalized in ("", "3class", "classification_3class", "classification"):
+            target_type_normalized = "3class"
+        elif target_type_normalized in ("binary", "2class", "classification_2class"):
+            target_type_normalized = "binary"
+
+        logger.info(f"Creating target variable (type={target_type_normalized or '3class'}, classes={num_classes})")
+
+        if target_type_normalized == "binary" or num_classes == 2:
+            return create_binary_target(
                 df=df,
                 lookahead_bars=self.config.target.lookahead_bars,
                 threshold_pct=self.config.target.threshold_pct
             )
-        else:
-            target_series = create_3class_target(
+        if target_type_normalized == "3class" or num_classes == 3:
+            return create_3class_target(
                 df=df,
                 lookahead_bars=self.config.target.lookahead_bars,
                 threshold_pct=self.config.target.threshold_pct
             )
 
-        return target_series
+        if target_type_normalized == "regression":
+            raise ValueError("Regression targets are not yet supported in this pipeline.")
+
+        raise ValueError(f"Unsupported target type '{target_type}'. Provide 'binary', '3class', or 'regression'.")
 
     def _compute_features(self, df: pd.DataFrame, feature_engine: FeatureEngine) -> pd.DataFrame:
         """Compute features using the feature engine."""

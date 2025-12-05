@@ -54,12 +54,12 @@ def validate_config_consistency(config) -> None:
     if hasattr(config, 'target'):
         target_config = config.target
         if hasattr(target_config, 'type'):
-            valid_types = ['binary', '3class', 'regression']
+            valid_types = ['binary', '3class', 'regression', 'classification', 'classification_2class', 'classification_3class', '']
             if target_config.type not in valid_types:
                 raise ValueError(f"Invalid target type '{target_config.type}'. Must be one of {valid_types}")
 
         # Validate class counts for classification targets
-        if hasattr(target_config, 'type') and target_config.type in ['binary', '3class']:
+        if hasattr(target_config, 'type') and target_config.type in ['binary', '3class', 'classification', 'classification_2class', 'classification_3class', '']:
             if not hasattr(target_config, 'lookahead_bars') or target_config.lookahead_bars <= 0:
                 raise ValueError("lookahead_bars must be positive for classification targets")
 

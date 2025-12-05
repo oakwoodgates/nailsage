@@ -10,6 +10,7 @@ from config.backtest import BacktestConfig
 from config.strategy import StrategyConfig
 from training.validation.time_series_split import TimeSeriesSplitter
 from training.validation.backtest import BacktestEngine
+from utils.determinism import set_random_seeds, validate_config_consistency
 from utils.logger import get_training_logger
 
 logger = get_training_logger()
@@ -39,6 +40,7 @@ class Validator:
             config: Strategy configuration
         """
         self.config = config
+        validate_config_consistency(config)
 
         # Create validation configuration
         validation_config = config.validation
@@ -106,6 +108,7 @@ class Validator:
         logger.info("="*70)
         logger.info("RUNNING WALK-FORWARD VALIDATION")
         logger.info("="*70)
+        set_random_seeds()
 
         # Generate splits
         splits = self.splitter.split(df_clean, timestamp_column='timestamp')
@@ -119,7 +122,7 @@ class Validator:
             logger.info(f"{'='*70}")
 
             split_result = self._validate_single_split(
-                model, df_clean, target_clean, feature_cols, split
+                df_clean, target_clean, feature_cols, split
             )
             split_results.append(split_result)
 
@@ -139,7 +142,6 @@ class Validator:
 
     def _validate_single_split(
         self,
-        model,
         df_clean: pd.DataFrame,
         target_clean: pd.Series,
         feature_cols: list,
@@ -151,10 +153,21 @@ class Validator:
             df_clean, split, timestamp_column='timestamp'
         )
 
+        # Prepare train/val sets
+        X_split_train = df_clean.iloc[train_idx][feature_cols]
+        y_split_train = target_clean.iloc[train_idx]
         X_split_val = df_clean.iloc[val_idx][feature_cols]
         y_split_val = target_clean.iloc[val_idx]
 
         logger.info(f"Split validation samples: {len(X_split_val):,}")
+
+        # Train fresh model for this split
+        model = self._create_model()
+        sample_weights = self._calculate_sample_weights(y_split_train)
+        fit_kwargs = {'X': X_split_train, 'y': y_split_train}
+        if sample_weights is not None:
+            fit_kwargs['sample_weight'] = sample_weights
+        model.fit(**fit_kwargs)
 
         # Generate predictions
         predictions = model.predict(X_split_val)
@@ -207,7 +220,7 @@ class Validator:
         from training.signal_pipeline import SignalPipeline
 
         signal_pipeline = SignalPipeline(self.config)
-        num_classes = self.config.target.classes or 3
+        num_classes = self._resolve_num_classes()
 
         signals = signal_pipeline.process_signals_for_backtest(
             predictions, probabilities, num_classes
@@ -254,6 +267,7 @@ class Validator:
             'total_trades': int(total_trades),
             'positive_splits': int(positive_splits),
             'consistency_pct': float(consistency_pct),
+            'n_splits': len(split_results),
         }
 
     def _log_aggregate_results(self, aggregate: Dict[str, Any]) -> None:
@@ -268,5 +282,57 @@ class Validator:
         logger.info(f"Average Max Drawdown: {aggregate['avg_max_drawdown'] * 100:.2f}%")
         logger.info(f"Average Win Rate: {aggregate['avg_win_rate'] * 100:.2f}%")
         logger.info(f"Total Trades (all splits): {aggregate['total_trades']}")
-        logger.info(f"Consistency: {aggregate['consistency_pct'] * 100:.1f}% ({aggregate['positive_splits']}/{len([]) if not hasattr(self, 'splitter') else self.splitter.n_splits} splits profitable)")
+        n_splits = aggregate.get('n_splits', getattr(self.splitter, "n_splits", 0))
+        logger.info(f"Consistency: {aggregate['consistency_pct'] * 100:.1f}% ({aggregate['positive_splits']}/{n_splits} splits profitable)")
         logger.info(f"{'='*70}")
+
+    def _create_model(self):
+        """Factory to create ML model based on type."""
+        model_type = self.config.model.type
+        params = self.config.model.params
+
+        if model_type == "xgboost":
+            import xgboost as xgb
+            return xgb.XGBClassifier(**params)
+        elif model_type == "lightgbm":
+            import lightgbm as lgb
+            return lgb.LGBMClassifier(**params)
+        elif model_type == "random_forest":
+            from sklearn.ensemble import RandomForestClassifier
+            return RandomForestClassifier(**params)
+        elif model_type == "extra_trees":
+            from sklearn.ensemble import ExtraTreesClassifier
+            return ExtraTreesClassifier(**params)
+        else:
+            raise ValueError(
+                f"Unsupported model type: {model_type}. "
+                "Supported types: xgboost, lightgbm, random_forest, extra_trees"
+            )
+
+    def _calculate_sample_weights(self, y_train: pd.Series):
+        """Calculate sample weights if class_weights provided."""
+        if not hasattr(self.config.target, 'class_weights') or not self.config.target.class_weights:
+            return None
+
+        class_weights = self.config.target.class_weights
+        sample_weights = np.array([class_weights[label] for label in y_train])
+
+        logger.info(f"Using class weights: {class_weights}")
+        return sample_weights
+
+    def _resolve_num_classes(self) -> int:
+        """Determine number of classes from target configuration."""
+        target_type = getattr(self.config.target, "type", "").lower()
+        explicit_classes = getattr(self.config.target, "classes", None)
+
+        if explicit_classes:
+            return explicit_classes
+
+        if target_type in ("binary", "2class", "classification_2class"):
+            return 2
+        if target_type in ("", "3class", "classification_3class", "classification"):
+            return 3
+        if target_type == "regression":
+            raise ValueError("Regression targets are not supported in validation pipeline.")
+
+        raise ValueError(f"Unsupported target type '{target_type}'")
