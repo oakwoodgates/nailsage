@@ -261,4 +261,7 @@ temp/
 *.tmp
 *.bak
 
+# Strategy configs (project-specific, not versioned)
+strategy-configs/
+
 .claude/settings.local.json
