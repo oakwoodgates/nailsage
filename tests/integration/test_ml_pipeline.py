@@ -27,7 +27,7 @@ from execution.inference.signal_generator import SignalGenerator, SignalGenerato
 from features.engine import FeatureEngine
 from models.registry import ModelMetadata, ModelRegistry
 from portfolio.signal import StrategySignal
-from targets.classification import create_binary_target
+from training.targets import create_binary_target
 
 
 @pytest.fixture

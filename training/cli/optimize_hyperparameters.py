@@ -19,7 +19,7 @@ from optuna.samplers import TPESampler
 from config.strategy import StrategyConfig
 from data.loader import DataLoader
 from features.engine import FeatureEngine
-from targets.classification import create_3class_target, create_binary_target
+from training.targets import create_3class_target, create_binary_target
 from validation.time_series_split import TimeSeriesSplitter
 from utils.logger import get_logger, setup_logger
 

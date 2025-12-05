@@ -9,7 +9,7 @@ import pandas as pd
 from config.strategy import StrategyConfig
 from data.loader import DataLoader
 from features.engine import FeatureEngine
-from targets.classification import create_3class_target, create_binary_target
+from training.targets import create_3class_target, create_binary_target
 from utils.logger import get_training_logger
 
 logger = get_training_logger()

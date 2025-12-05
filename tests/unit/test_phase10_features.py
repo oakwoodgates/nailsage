@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from targets.classification import create_binary_target, create_3class_target
+from training.targets import create_binary_target, create_3class_target
 from validation.backtest import BacktestEngine
 from config.backtest import BacktestConfig
 

@@ -41,7 +41,7 @@ from config.strategy import StrategyConfig
 from features.engine import FeatureEngine
 from models import ModelRegistry
 from models.feature_schema import FeatureSchema
-from targets.classification import create_3class_target, create_binary_target
+from training.targets import create_3class_target, create_binary_target
 from validation.backtest import BacktestEngine
 from validation.time_series_split import TimeSeriesSplitter
 

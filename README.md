@@ -149,7 +149,8 @@ nailsage/
 │   ├── data_pipeline.py      # Data loading and preparation
 │   ├── signal_pipeline.py    # Signal generation and filtering
 │   ├── validator.py          # Walk-forward validation
-│   └── backtest_pipeline.py  # Backtesting workflow
+│   ├── backtest_pipeline.py  # Backtesting workflow
+│   └── targets.py            # Target variable creation
 ├── validation/                # Validation framework
 │   ├── time_series_split.py # Walk-forward splitting
 │   ├── backtest.py           # Backtesting engine
@@ -161,8 +162,6 @@ nailsage/
 │   ├── utils.py              # Model utilities
 │   ├── trained/              # Serialized models
 │   └── metadata/             # Model metadata (JSON)
-├── targets/                   # Target variable creation
-│   └── classification.py     # Binary and multiclass targets
 ├── api/                       # FastAPI REST/WebSocket API
 │   ├── routers/              # Endpoint routers
 │   │   ├── strategies.py     # Strategy management
