@@ -169,7 +169,7 @@ class MultiStrategyEngine:
         logger.info(f"\n  Setting up strategy: {strategy_id}")
 
         # Load strategy config from YAML
-        config_path = Path("configs") / "strategies" / f"{strategy_id}.yaml"
+        config_path = Path("strategies") / f"{strategy_id}.yaml"
         if not config_path.exists():
             raise FileNotFoundError(f"Strategy config not found: {config_path}")
 
