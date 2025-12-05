@@ -72,7 +72,10 @@ class MultiStrategyEngine:
         self.position_tracker = None
         self.order_executor = None
         self.model_registry = None
-        self.strategies: Dict[int, LiveStrategy] = {}  # starlisting_id -> LiveStrategy
+        # Strategy storage: keyed by strategy_id (unique) not starlisting_id
+        self.strategies: Dict[str, LiveStrategy] = {}  # strategy_id -> LiveStrategy
+        # Mapping: starlisting_id -> list of strategy_ids (for routing candles)
+        self.starlisting_to_strategies: Dict[int, List[str]] = {}
         self._running = False
 
         logger.info("=" * 70)
@@ -137,12 +140,16 @@ class MultiStrategyEngine:
         if not self.starlisting_ids:
             logger.warning("  No starlistings specified in STARLISTING_IDS")
         else:
-            for starlisting_id in self.starlisting_ids:
+            # Subscribe to unique starlistings only (avoid duplicate subscriptions)
+            unique_starlistings = set(self.starlisting_ids)
+            for starlisting_id in unique_starlistings:
                 await self.ws_client.subscribe(
                     starlisting_id=starlisting_id,
                     history=500,
                 )
-                logger.info(f"  ✓ Subscribed to starlisting {starlisting_id}")
+                # Show how many strategies use this starlisting
+                strategy_count = len(self.starlisting_to_strategies.get(starlisting_id, []))
+                logger.info(f"  ✓ Subscribed to starlisting {starlisting_id} ({strategy_count} strategies)")
 
         logger.info("\n" + "=" * 70)
         logger.info("Multi-strategy engine initialized successfully!")
@@ -191,10 +198,11 @@ class MultiStrategyEngine:
         logger.info(f"    Version: {version}")
         logger.info(f"    Asset: {symbol}/USDT")
 
-        # Find model using actual strategy name and timeframe from config
+        # Find model using actual strategy name, timeframe, and version from config
         model_metadata = self.model_registry.get_latest_model(
             strategy_name=strategy_name,
             strategy_timeframe=strategy_timeframe,
+            version=version,
         )
 
         if not model_metadata:
@@ -289,8 +297,16 @@ class MultiStrategyEngine:
         # TODO: Phase 1.2 - Integrate RiskManager for pre-trade validation
 
         await strategy.start()
-        self.strategies[starlisting_id] = strategy
-        logger.info(f"    ✓ Strategy '{strategy_id}' initialized")
+
+        # Store strategy by strategy_id (unique key, not starlisting_id)
+        self.strategies[strategy_id] = strategy
+
+        # Map starlisting to strategies for candle routing
+        if starlisting_id not in self.starlisting_to_strategies:
+            self.starlisting_to_strategies[starlisting_id] = []
+        self.starlisting_to_strategies[starlisting_id].append(strategy_id)
+
+        logger.info(f"    ✓ Strategy '{strategy_id}' initialized (starlisting {starlisting_id})")
 
     def _on_candle(self, candle_update: CandleUpdate):
         """Handle incoming candle update."""
@@ -301,21 +317,23 @@ class MultiStrategyEngine:
             interval=candle_update.interval,
         )
 
-        # Process with strategy (if we have one for this starlisting)
-        if candle_update.starlisting_id in self.strategies:
-            strategy = self.strategies[candle_update.starlisting_id]
-
-            # Create candle getter function for this starlisting
+        # Route candle to ALL strategies that use this starlisting
+        starlisting_id = candle_update.starlisting_id
+        if starlisting_id in self.starlisting_to_strategies:
+            # Create candle getter function for this starlisting (shared by all strategies)
             def get_candles(n):
-                buffer = self.candle_buffer.get(candle_update.starlisting_id)
+                buffer = self.candle_buffer.get(starlisting_id)
                 if buffer:
                     return buffer.to_dataframe(n=n)
                 return None
 
-            # Schedule async processing
-            asyncio.create_task(
-                strategy.on_candle_update(candle_update, get_candles)
-            )
+            # Process ALL strategies that use this starlisting
+            for strategy_id in self.starlisting_to_strategies[starlisting_id]:
+                strategy = self.strategies[strategy_id]
+                # Schedule async processing for each strategy
+                asyncio.create_task(
+                    strategy.on_candle_update(candle_update, get_candles)
+                )
 
     def _on_error(self, error: str, details: str = None):
         """Handle WebSocket error."""
@@ -353,7 +371,7 @@ class MultiStrategyEngine:
         logger.info(f"Status Update ({self.exchange.upper()})")
         logger.info("-" * 70)
 
-        for starlisting_id, strategy in self.strategies.items():
+        for strategy_id, strategy in self.strategies.items():
             stats = strategy.get_stats()
             pos_stats = stats['position_stats']
 
@@ -407,10 +425,13 @@ class MultiStrategyEngine:
                 logger.info("")
                 logger.info("  Open Position Details:")
                 for position in open_positions:
+                    pos_id = position.id if position.id is not None else "?"
+                    pos_side = position.side.upper() if position.side else "UNKNOWN"
+                    pos_pnl = position.unrealized_pnl if position.unrealized_pnl is not None else 0.0
                     logger.info(
-                        f"    Position #{position.id} [{position.side.upper()}]: "
+                        f"    Position #{pos_id} [{pos_side}]: "
                         f"Entry ${position.entry_price:,.2f} → Current ${current_price:,.2f} | "
-                        f"P&L: ${position.unrealized_pnl:,.2f}"
+                        f"P&L: ${pos_pnl:,.2f}"
                     )
 
         logger.info("-" * 70 + "\n")

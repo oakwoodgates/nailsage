@@ -13,7 +13,7 @@ import pandas as pd
 
 from execution.inference.predictor import ModelPredictor, Prediction
 from execution.inference.signal_generator import SignalGenerator
-from execution.persistence.state_manager import StateManager, Signal as SignalRecord
+from execution.persistence.state_manager import StateManager, Signal as SignalRecord, Position
 from execution.simulator.order_executor import OrderExecutor
 from execution.tracking.position_tracker import PositionTracker
 from portfolio.signal import StrategySignal
@@ -374,8 +374,13 @@ class TradeExecutionPipeline:
                 f"price=${result.fill_price:,.2f}"
             )
 
-    async def _close_position(self, context: TradeContext, position) -> None:
+    async def _close_position(self, context: TradeContext, position: Position) -> None:
         """Close an existing position and update strategy bankroll."""
+        # Validate position
+        if position is None or position.side is None:
+            logger.error("Cannot close position: invalid position object")
+            return
+
         # Execute closing order
         opposite_side = "short" if position.side == "long" else "long"
 

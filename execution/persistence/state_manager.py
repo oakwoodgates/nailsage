@@ -548,11 +548,17 @@ class StateManager:
 
     def _row_to_position(self, row: Any) -> Position:
         """Convert database row to Position object."""
+        # Validate critical fields
+        side = row["side"]
+        if side not in ('long', 'short'):
+            logger.warning(f"Invalid position side '{side}' for position {row['id']}, defaulting to 'long'")
+            side = 'long'
+
         return Position(
             id=row["id"],
             strategy_id=row["strategy_id"],
             starlisting_id=row["starlisting_id"],
-            side=row["side"],
+            side=side,
             size=row["size"],
             entry_price=row["entry_price"],
             entry_timestamp=row["entry_timestamp"],
