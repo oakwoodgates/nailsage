@@ -51,6 +51,7 @@ from typing import Optional
 
 from execution.inference.predictor import Prediction
 from portfolio.signal import StrategySignal
+from training.signal_pipeline import SignalPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,7 @@ class SignalGenerator:
             config: SignalGeneratorConfig instance
         """
         self.config = config
+        self.signal_pipeline = SignalPipeline(self._create_strategy_config())
         self._last_signal: Optional[int] = None  # -1, 0, 1
         self._last_signal_timestamp: Optional[int] = None  # Unix ms
         self._signals_generated: int = 0
@@ -132,6 +134,26 @@ class SignalGenerator:
                 "position_size_pct": config.position_size_pct,
                 "cooldown_bars": config.cooldown_bars,
             }
+        )
+
+    def _create_strategy_config(self):
+        """Create a minimal StrategyConfig for the shared SignalPipeline."""
+        from config.strategy import StrategyConfig
+
+        # Create a minimal config with just the target settings we need
+        class MinimalConfig:
+            def __init__(self, confidence_threshold=0.0, classes=3):
+                self.target = type('Target', (), {
+                    'confidence_threshold': confidence_threshold,
+                    'classes': classes
+                })()
+                self.backtest = type('Backtest', (), {
+                    'min_bars_between_trades': 0
+                })()
+
+        return MinimalConfig(
+            confidence_threshold=self.config.confidence_threshold,
+            classes=3  # Default to 3-class, will be auto-detected
         )
 
     def generate_signal(
@@ -160,21 +182,30 @@ class SignalGenerator:
         3. Cooldown period has elapsed since last signal
         4. If neutral signal, check allow_neutral_signals config
         """
-        # Detect number of classes and convert prediction to signal direction
-        num_classes = self._detect_num_classes(prediction)
-        signal_direction = self._prediction_to_signal(prediction.prediction, num_classes)
+        # Use shared signal processing logic
+        # First check if neutral signals are allowed
+        if not self.config.allow_neutral_signals:
+            # Temporarily modify config for shared pipeline
+            original_threshold = self.signal_pipeline.config.target.confidence_threshold
+            self.signal_pipeline.config.target.confidence_threshold = 0.0  # Allow all signals through
+            # We'll filter neutral signals below
+            neutral_allowed = False
+        else:
+            neutral_allowed = True
 
-        # Check if neutral signals are allowed
-        if signal_direction == 0 and not self.config.allow_neutral_signals:
+        # Convert prediction to signal using shared logic
+        import numpy as np
+        predictions_array = np.array([prediction.prediction])
+        probabilities_array = np.array([list(prediction.probabilities.values())])
+
+        signals = self.signal_pipeline.convert_predictions_to_signals(
+            predictions_array, probabilities_array, num_classes=3
+        )
+        signal_direction = int(signals[0])
+
+        # Check if neutral signals are allowed (if we disabled them above)
+        if not neutral_allowed and signal_direction == 0:
             logger.info("Signal suppressed: Neutral signal not allowed")
-            return None
-
-        # Check confidence threshold
-        if prediction.confidence < self.config.confidence_threshold:
-            logger.info(
-                f"Signal suppressed: Confidence {prediction.confidence:.2%} "
-                f"< threshold {self.config.confidence_threshold:.2%}"
-            )
             return None
 
         # Check deduplication (same signal as last)
@@ -206,6 +237,10 @@ class SignalGenerator:
                 f"({bars_since_last}/{self.config.cooldown_bars} bars elapsed)"
             )
             return None
+
+        # Restore original threshold if we modified it
+        if not neutral_allowed:
+            self.signal_pipeline.config.target.confidence_threshold = original_threshold
 
         # Calculate position size as percentage of current bankroll
         position_size_usd = current_bankroll * (self.config.position_size_pct / 100.0)
@@ -240,92 +275,6 @@ class SignalGenerator:
 
         return signal
 
-    def _detect_num_classes(self, prediction: Prediction) -> int:
-        """
-        Detect the number of classification classes from prediction.
-
-        Detection logic:
-        - If probabilities dict has 'neutral' key with value 0.0 → binary (2-class)
-        - If max prediction class is 4 → 5-class
-        - Otherwise → 3-class (default)
-
-        Args:
-            prediction: Prediction object with probabilities dict
-
-        Returns:
-            Number of classes (2, 3, or 5)
-        """
-        # Check for binary model (neutral probability is 0.0)
-        if prediction.probabilities.get('neutral', 0.0) == 0.0:
-            return 2
-
-        # Check for 5-class model (has 'strong_short', 'weak_short', etc.)
-        if 'strong_short' in prediction.probabilities or 'weak_long' in prediction.probabilities:
-            return 5
-
-        # Check by max prediction class value
-        if prediction.prediction >= 4:
-            return 5
-
-        # Default to 3-class
-        return 3
-
-    def _prediction_to_signal(self, prediction_class: int, num_classes: int = 3) -> int:
-        """
-        Convert prediction class to signal direction.
-
-        Supports multiple classification modes:
-
-        Binary (2-class) - aggressive, always in position:
-        - Class 0 → Short (-1)
-        - Class 1 → Long (+1)
-
-        3-class - standard, can stay flat:
-        - Class 0 → Short (-1)
-        - Class 1 → Neutral (0)
-        - Class 2 → Long (+1)
-
-        5-class - graduated confidence:
-        - Class 0 → Strong Short (-1)
-        - Class 1 → Weak Short (-1)
-        - Class 2 → Neutral (0)
-        - Class 3 → Weak Long (+1)
-        - Class 4 → Strong Long (+1)
-
-        Args:
-            prediction_class: Prediction class from model
-            num_classes: Number of classification classes (2, 3, or 5)
-
-        Returns:
-            Signal direction: -1=short, 0=neutral, 1=long
-        """
-        if num_classes == 2:
-            # Binary: 0=short, 1=long (no neutral)
-            mapping = {
-                0: -1,  # short
-                1: 1,   # long
-            }
-            return mapping.get(prediction_class, 0)
-
-        elif num_classes == 5:
-            # 5-class: strong/weak short, neutral, weak/strong long
-            mapping = {
-                0: -1,  # strong short
-                1: -1,  # weak short
-                2: 0,   # neutral
-                3: 1,   # weak long
-                4: 1,   # strong long
-            }
-            return mapping.get(prediction_class, 0)
-
-        else:
-            # 3-class (default): short, neutral, long
-            mapping = {
-                0: -1,  # short
-                1: 0,   # neutral
-                2: 1,   # long
-            }
-            return mapping.get(prediction_class, 0)
 
     def _is_cooldown_elapsed(
         self,
