@@ -50,6 +50,35 @@ async def list_strategies(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/by-arena/{arena_id}", response_model=StrategyListResponse)
+async def get_strategies_by_arena(
+    arena_id: int,
+    active_only: bool = Query(True, description="Filter to active strategies only"),
+    strategy_service: StrategyService = Depends(get_strategy_service),
+):
+    """Get strategies for a specific arena.
+
+    Args:
+        arena_id: Arena ID
+        active_only: If True, return only active strategies
+
+    Returns:
+        List of strategies using this arena
+    """
+    try:
+        strategies = strategy_service.get_strategies_by_arena(
+            arena_id=arena_id,
+            active_only=active_only,
+        )
+        return StrategyListResponse(
+            strategies=strategies,
+            total=len(strategies),
+        )
+    except Exception as e:
+        logger.error(f"Error getting strategies for arena {arena_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{strategy_id}", response_model=StrategyResponse)
 async def get_strategy(
     strategy_id: int,
