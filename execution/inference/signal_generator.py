@@ -198,9 +198,20 @@ class SignalGenerator:
         predictions_array = np.array([prediction.prediction])
         probabilities_array = np.array([list(prediction.probabilities.values())])
 
-        signals = self.signal_pipeline.convert_predictions_to_signals(
-            predictions_array, probabilities_array, num_classes=3
-        )
+        num_classes = self._detect_num_classes(prediction)
+        max_confidence = float(np.max(probabilities_array))
+        if max_confidence < self.config.confidence_threshold:
+            return None
+
+        if num_classes == 5:
+            signals = self._convert_5class_predictions(predictions_array)
+        else:
+            signals = self.signal_pipeline.process_signals_for_backtest(
+                predictions_array,
+                probabilities_array,
+                num_classes=num_classes if num_classes in (2, 3) else 3,
+            )
+
         signal_direction = int(signals[0])
 
         # Check if neutral signals are allowed (if we disabled them above)
@@ -300,6 +311,45 @@ class SignalGenerator:
         )
 
         return bars_since_last >= self.config.cooldown_bars
+
+    def _detect_num_classes(self, prediction: Prediction) -> int:
+        """Infer number of classes from prediction probabilities."""
+        probs = prediction.probabilities
+        prob_len = len(probs)
+
+        # Explicit 5-class detection by key set
+        five_class_keys = {"strong_short", "weak_short", "neutral", "weak_long", "strong_long"}
+        if set(probs.keys()) == five_class_keys:
+            return 5
+
+        # If prediction class >= 4, treat as 5-class
+        if prediction.prediction is not None and prediction.prediction >= 4:
+            return 5
+
+        # Binary encoded as 3 keys with neutral=0
+        if prob_len == 3 and {"short", "neutral", "long"}.issuperset(probs.keys()):
+            if probs.get("neutral", 0.0) == 0.0:
+                return 2
+
+        if prob_len in (2, 3, 5):
+            return prob_len
+
+        return 3
+
+    def _convert_5class_predictions(self, predictions: "np.ndarray") -> "np.ndarray":
+        """
+        Map 5-class predictions to {-1, 0, 1}.
+
+        0 -> strong short (-1)
+        1 -> weak short (-1)
+        2 -> neutral (0)
+        3 -> weak long (1)
+        4 -> strong long (1)
+        """
+        import numpy as np
+
+        mapping = {0: -1, 1: -1, 2: 0, 3: 1, 4: 1}
+        return np.vectorize(mapping.get)(predictions)
 
     def _bars_since_last_signal(
         self,
