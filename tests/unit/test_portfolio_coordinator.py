@@ -3,9 +3,9 @@
 import pytest
 from datetime import datetime
 
-from portfolio.coordinator import PortfolioCoordinator
-from portfolio.position import Position
-from portfolio.signal import StrategySignal
+from execution.portfolio.coordinator import PortfolioCoordinator
+from execution.portfolio.position import Position
+from execution.portfolio.signal import StrategySignal
 
 
 class TestPortfolioCoordinator:

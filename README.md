@@ -8,9 +8,7 @@ Named after the Great Nailsage Sly, trainer of the Nailmasters, from Hollow Knig
 
 NailSage is a production-ready ML trading research platform designed for building, testing, and deploying machine learning trading strategies with rigorous validation and complete reproducibility.
 
-**Current Status**: MVP Complete (35/35 milestones, 100%) ✅ - Paper trading operational with model quality improvements
-
-**Phase 1 Focus**: Classical ML (XGBoost, LightGBM, Random Forest) with walk-forward validation
+**Status**: Production ML Trading Platform ✅ - Live paper trading operational
 
 ## ✨ Key Features
 
@@ -20,12 +18,12 @@ NailSage is a production-ready ML trading research platform designed for buildin
 - **✅ Hybrid Model Registry**: Track configuration intent and training history
 - **✅ Dynamic Feature Engineering**: 18 technical indicators computed on-the-fly
 - **✅ Modular Architecture**: Independent strategies with centralized model management
-- **✅ Binary Classification Models**: Phase 10 aggressive trading with SHORT/LONG signals
-- **✅ Confidence-Based Filtering**: Minimum confidence thresholds for signal generation
-- **✅ Signal Cooldown**: Prevents spam with minimum bars between signals
-- **✅ Real-Time P&L Updates**: Position profitability updated every candle
-- **✅ Transparent Decision Logging**: See why signals are generated or suppressed
-- **✅ Smart Feature Caching**: Enabled for training/backtesting, disabled for live trading
+- **✅ Binary Classification Models**: SHORT/LONG signals with confidence filtering
+- **✅ Real-Time Execution**: Live paper trading with realistic market simulation
+- **✅ Risk Management**: Per-strategy bankrolls with automatic position sizing
+- **✅ Transparent Logging**: Complete audit trail of signal generation and execution
+- **✅ Production Deployment**: Docker-based multi-strategy execution
+- **✅ Walk-Forward Validation**: Time series cross-validation preventing data leakage
 
 ## 🚀 Quick Start
 
@@ -57,13 +55,13 @@ python scripts/generate_data_metadata.py --dir data/raw
 
 ```bash
 # Train with walk-forward validation (saves results to JSON)
-python scripts/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
+python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml
 
 # Validate existing model
-python scripts/validate_model.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/validate_model.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 
 # Quick backtest
-python scripts/run_backtest.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/run_backtest.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 ```
 
 ### Run Tests
@@ -125,39 +123,71 @@ nailsage/
 │   ├── strategy.py           # StrategyConfig
 │   ├── backtest.py           # BacktestConfig (fees, slippage)
 │   └── risk.py               # RiskConfig (position sizing)
-├── configs/                   # YAML configuration files
+├── configs/                   # Default configuration files
+├── strategies/          # Strategy YAML configs (not versioned)
 ├── data/                      # Data management
 │   ├── loader.py             # Load OHLCV data (Parquet/CSV)
 │   ├── validator.py          # Data quality validation
 │   ├── metadata.py           # Dataset provenance tracking
+│   ├── generate_metadata.py  # Metadata generation utility
 │   └── raw/                  # Raw OHLCV data storage
 ├── features/                  # Feature engineering
 │   ├── engine.py             # Dynamic feature computation
 │   ├── indicators/           # 8 technical indicators
 │   └── cache/                # Feature cache storage
-├── validation/                # Validation framework
-│   ├── time_series_split.py # Walk-forward splitting
-│   ├── backtest.py           # Backtesting engine
-│   ├── metrics.py            # Performance metrics
-│   └── walk_forward.py       # Complete validation pipeline
+├── training/                  # ML training & backtesting
+│   ├── cli/                  # Training command-line tools
+│   │   ├── train_model.py    # Main training entry point
+│   │   ├── run_backtest.py   # Backtesting entry point
+│   │   ├── validate_model.py # Standalone validation
+│   │   └── optimize_hyperparameters.py # Hyperparameter optimization
+│   ├── pipeline.py           # TrainingPipeline orchestrator
+│   ├── data_pipeline.py      # Data loading and preparation
+│   ├── signal_pipeline.py    # Signal generation and filtering
+│   ├── validator.py          # Walk-forward validation
+│   ├── backtest_pipeline.py  # Backtesting workflow
+│   └── targets.py            # Target variable creation
+├── execution/                 # Paper trading & live execution
+│   ├── cli/                  # Execution command-line tools
+│   │   ├── run_multi_strategy.py # Multi-strategy paper trading
+│   │   ├── check_paper_trading_stats.py # Statistics checker
+│   │   ├── test_websocket_integration.py # WebSocket testing
+│   │   ├── test_signal_save.py # Signal testing
+│   │   └── debug_kirby_messages.py # Kirby debugging
+│   ├── portfolio/            # Portfolio coordination & signals
+│   │   ├── coordinator.py    # PortfolioCoordinator class
+│   │   ├── position.py       # Position tracking
+│   │   └── signal.py         # StrategySignal class
+│   ├── inference/            # Model inference for live trading
+│   ├── persistence/          # Database state management
+│   ├── risk/                 # Risk management
+│   ├── runner/               # Live strategy orchestration
+│   ├── simulator/            # Order execution simulation
+│   ├── streaming/            # Real-time data processing
+│   ├── tracking/             # Position management
+│   ├── websocket/            # Live market data connection
+│   └── state/                # Database files
 ├── models/                    # Model registry & metadata
 │   ├── metadata.py           # ModelMetadata (hybrid IDs)
 │   ├── registry.py           # Centralized model storage
 │   ├── utils.py              # Model utilities
 │   ├── trained/              # Serialized models
 │   └── metadata/             # Model metadata (JSON)
-├── strategies/                # Strategy implementations
-│   ├── short_term/           # Short-term strategies
-│   └── long_term/            # Long-term strategies
-├── tests/                     # Test suite (145 passing tests)
+├── api/                       # FastAPI REST/WebSocket API
+│   ├── routers/              # Endpoint routers
+│   │   ├── strategies.py     # Strategy management
+│   │   ├── arenas.py         # Arena metadata (exchange, pair, interval)
+│   │   ├── positions.py      # Position tracking
+│   │   └── trades.py         # Trade history
+│   ├── services/             # Business logic layer
+│   ├── schemas/              # Pydantic models
+│   └── websocket/            # Real-time updates
+├── tests/                     # Test suite
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
-└── scripts/                   # Training & utility scripts
-    ├── train_model.py        # Generic training with walk-forward validation
-    ├── validate_model.py     # Standalone model validation
-    ├── run_backtest.py       # Quick backtesting
-    ├── generate_data_metadata.py
-    ├── test_model_registry.py
+│       ├── test_kirby_websocket.py # WebSocket integration
+│       └── test_model_registry_demo.py # Model registry demo
+└── scripts/                   # Development utilities
     └── verify_imports.py
 ```
 
@@ -219,42 +249,22 @@ assert lookback_window < split_start_timestamp
 **Model Registry**:
 - ModelMetadata, ModelRegistry, Hybrid ID system
 
-## 🎓 Next Steps
+## 📚 Documentation
 
-**Ready to train your first model?** See [MODEL_TRAINING.md](docs/MODEL_TRAINING.md) for comprehensive training and validation guide.
+**Getting Started**:
+- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - Complete training and validation guide
+- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment and paper trading
+- [docs/ACTIVE_FILES.md](docs/ACTIVE_FILES.md) - Codebase structure reference
 
-**Key Documentation**:
-- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - **NEW**: Training, validation, and backtesting guide
-- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide (legacy)
-- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment guide
-- [.claude/PROJECT_CONTEXT.md](.claude/PROJECT_CONTEXT.md) - Complete project overview
-- [.claude/STATUS.md](.claude/STATUS.md) - Current status and progress
-- [.claude/DECISIONS.md](.claude/DECISIONS.md) - Architectural Decision Records
+**API & Integration**:
+- [docs/API.md](docs/API.md) - REST API for portfolio management
+- [docs/WEBSOCKET.md](docs/WEBSOCKET.md) - Real-time WebSocket connections
+- [docs/DATABASE.md](docs/DATABASE.md) - Database schema and operations
 
-## 📈 Current Status
+**Architecture**:
+- [docs/DECISIONS.md](docs/DECISIONS.md) - Key architectural decisions
+- [docs/FEATURE_SCHEMA_USAGE.md](docs/FEATURE_SCHEMA_USAGE.md) - Feature engineering details
 
-**MVP Complete** (35/35 milestones): ✅
-- ✅ Core infrastructure & configuration (Phases 1-5)
-- ✅ Data pipeline with quality validation
-- ✅ Feature engineering (10 indicators)
-- ✅ Validation framework (walk-forward, backtesting)
-- ✅ Model registry with hybrid IDs
-- ✅ Multi-algorithm support (XGBoost, LightGBM, RandomForest, ExtraTrees)
-- ✅ Portfolio coordination system
-- ✅ Paper trading infrastructure (Phase 8-9)
-  - WebSocket client with Kirby API integration
-  - Live inference pipeline
-  - State persistence (SQLite)
-- ✅ Model quality improvements (Phase 10)
-  - Binary classification support
-  - Confidence-based position sizing
-  - Trade cooldown mechanism
-  - Hyperparameter optimization
-- ✅ Unit tests (145 passing)
-
-**Ready for Production Testing**:
-- Paper trading validation with real models
-- Extended monitoring and performance tracking
 
 ## 🔬 Testing
 

@@ -117,7 +117,9 @@ class KirbyBridge:
         logger.info(f"Client {connection_id} subscribing to starlistings: {starlisting_ids} (history={history})")
 
         for starlisting_id in starlisting_ids:
-            if starlisting_id not in self._subscriptions:
+            is_new_subscription = starlisting_id not in self._subscriptions
+
+            if is_new_subscription:
                 self._subscriptions[starlisting_id] = set()
                 self._pending_history[starlisting_id] = history
                 # Need to subscribe to Kirby
@@ -129,6 +131,14 @@ class KirbyBridge:
                     logger.warning(
                         f"WebSocket not connected - queued subscription for starlisting {starlisting_id}"
                     )
+            elif history > 0 and self._ws:
+                # Already subscribed to Kirby, but new client needs historical data
+                # Re-subscribe to trigger historical data (will be sent to all clients)
+                logger.info(
+                    f"Re-requesting historical data for starlisting {starlisting_id} "
+                    f"(existing subscription, new client {connection_id})"
+                )
+                await self._subscribe_to_kirby(starlisting_id, history)
 
             self._subscriptions[starlisting_id].add(connection_id)
             logger.info(

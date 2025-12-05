@@ -22,7 +22,7 @@ dependencies = [
     "pyarrow>=14.0.0",  # Parquet support
 
     # Machine Learning
-    "scikit-learn>=1.3.0",
+    "scikit-learn==1.7.2",  # Pinned version for model compatibility
     "xgboost>=2.0.0",
     "lightgbm>=4.1.0",
     "imbalanced-learn>=0.11.0",  # Handle class imbalance
@@ -107,7 +107,7 @@ all = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["config*", "data*", "features*", "strategies*", "validation*", "models*", "execution*", "utils*"]
-exclude = ["tests*", "experiments*", "scripts*"]
+exclude = ["tests*", "scripts*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -143,7 +143,6 @@ markers = [
 source = ["."]
 omit = [
     "*/tests/*",
-    "*/experiments/*",
     "*/__init__.py",
     "data/*",
     "logs/*",

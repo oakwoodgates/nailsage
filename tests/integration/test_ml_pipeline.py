@@ -20,14 +20,14 @@ import pytest
 from sklearn.ensemble import RandomForestClassifier
 
 from config.backtest import BacktestConfig
-from validation.backtest import BacktestEngine
+from training.validation.backtest import BacktestEngine
 from config.feature import FeatureConfig
 from execution.inference.predictor import ModelPredictor
 from execution.inference.signal_generator import SignalGenerator, SignalGeneratorConfig
 from features.engine import FeatureEngine
 from models.registry import ModelMetadata, ModelRegistry
-from portfolio.signal import StrategySignal
-from targets.classification import create_binary_target
+from execution.portfolio.signal import StrategySignal
+from training.targets import create_binary_target
 
 
 @pytest.fixture

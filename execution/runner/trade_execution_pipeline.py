@@ -13,10 +13,10 @@ import pandas as pd
 
 from execution.inference.predictor import ModelPredictor, Prediction
 from execution.inference.signal_generator import SignalGenerator
-from execution.persistence.state_manager import StateManager, Signal as SignalRecord
+from execution.persistence.state_manager import StateManager, Signal as SignalRecord, Position
 from execution.simulator.order_executor import OrderExecutor
 from execution.tracking.position_tracker import PositionTracker
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
 
 logger = logging.getLogger(__name__)
 
@@ -206,10 +206,26 @@ class TradeExecutionPipeline:
         )
         has_open_positions = len(open_positions) > 0
 
+        # Get current bankroll for this strategy
+        strategy = await asyncio.to_thread(
+            self.state_manager.get_strategy_by_id,
+            context.strategy_id
+        )
+        current_bankroll = strategy.current_bankroll if strategy else 10000.0
+
+        # Block new trades if bankroll is depleted (but allow closing existing positions)
+        if current_bankroll <= 0 and not has_open_positions:
+            logger.warning(
+                f"Strategy {context.strategy_name} bankroll depleted "
+                f"(${current_bankroll:.2f}). Skipping new trades."
+            )
+            return None
+
         signal = self.signal_generator.generate_signal(
             prediction,
             candle_interval_ms=context.candle_interval_ms,
             has_open_positions=has_open_positions,
+            current_bankroll=current_bankroll,
         )
 
         if signal:
@@ -358,8 +374,13 @@ class TradeExecutionPipeline:
                 f"price=${result.fill_price:,.2f}"
             )
 
-    async def _close_position(self, context: TradeContext, position) -> None:
-        """Close an existing position."""
+    async def _close_position(self, context: TradeContext, position: Position) -> None:
+        """Close an existing position and update strategy bankroll."""
+        # Validate position
+        if position is None or position.side is None:
+            logger.error("Cannot close position: invalid position object")
+            return
+
         # Execute closing order
         opposite_side = "short" if position.side == "long" else "long"
 
@@ -379,8 +400,8 @@ class TradeExecutionPipeline:
         )
 
         if result.success:
-            # Close position in tracker
-            await asyncio.to_thread(
+            # Close position in tracker (this calculates realized P&L)
+            closed_position = await asyncio.to_thread(
                 self.position_tracker.close_position,
                 position_id=position.id,
                 exit_price=result.fill_price,
@@ -391,9 +412,42 @@ class TradeExecutionPipeline:
             if result.trade:
                 await asyncio.to_thread(self.state_manager.save_trade, result.trade)
 
+            # Update strategy bankroll with realized P&L
+            if closed_position and closed_position.realized_pnl is not None:
+                await self._update_strategy_bankroll(
+                    context.strategy_id,
+                    closed_position.realized_pnl
+                )
+
+            realized_pnl = closed_position.realized_pnl if closed_position else 0
             logger.info(
                 f"Closed {position.side} position: "
-                f"P&L=${result.fill_price - position.entry_price:+,.2f}"
+                f"P&L=${realized_pnl:+,.2f}"
+            )
+
+    async def _update_strategy_bankroll(self, strategy_id: int, pnl: float) -> None:
+        """
+        Update strategy bankroll after a trade closes.
+
+        Args:
+            strategy_id: Strategy ID
+            pnl: Realized P&L from the closed trade (can be negative)
+        """
+        strategy = await asyncio.to_thread(
+            self.state_manager.get_strategy_by_id,
+            strategy_id
+        )
+
+        if strategy:
+            new_bankroll = strategy.current_bankroll + pnl
+            await asyncio.to_thread(
+                self.state_manager.update_strategy_bankroll,
+                strategy_id,
+                new_bankroll
+            )
+            logger.info(
+                f"Updated strategy {strategy_id} bankroll: "
+                f"${strategy.current_bankroll:.2f} + ${pnl:+.2f} = ${new_bankroll:.2f}"
             )
 
     async def _update_positions(self, context: TradeContext) -> None:

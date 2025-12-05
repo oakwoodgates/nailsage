@@ -278,6 +278,7 @@ class LiveStrategy:
         open_positions = self.pipeline.position_tracker.get_open_positions(strategy_id=self.config.strategy_id)
 
         return {
+            "strategy_id": self.config.strategy_id,
             "strategy_name": self.config.strategy_name,
             "candles_processed": self._candles_processed,
             "signals_generated": self._signals_generated,

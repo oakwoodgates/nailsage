@@ -24,6 +24,8 @@ from api.routers.positions import router as positions_router
 from api.routers.portfolio import router as portfolio_router
 from api.routers.stats import router as stats_router
 from api.routers.candles import router as candles_router
+from api.routers.models import router as models_router
+from api.routers.arenas import router as arenas_router
 from api.middleware.logging import RequestLoggingMiddleware
 from api.middleware.error_handler import ErrorHandlerMiddleware
 from api.websocket.manager import get_connection_manager
@@ -125,6 +127,8 @@ REST API and WebSocket for the Nailsage trading dashboard.
 All REST endpoints are versioned at `/api/v1/`:
 
 - **Strategies**: `/api/v1/strategies` - Strategy management and stats
+- **Models**: `/api/v1/models` - ML model metadata and results
+- **Arenas**: `/api/v1/arenas` - Trading arenas (exchange + pair + interval)
 - **Trades**: `/api/v1/trades` - Trade history
 - **Positions**: `/api/v1/positions` - Position tracking
 - **Portfolio**: `/api/v1/portfolio` - Portfolio overview
@@ -179,6 +183,8 @@ ws.onmessage = (event) => {
     # Include routers
     app.include_router(health_router)
     app.include_router(strategies_router)
+    app.include_router(models_router)
+    app.include_router(arenas_router)
     app.include_router(trades_router)
     app.include_router(positions_router)
     app.include_router(portfolio_router)

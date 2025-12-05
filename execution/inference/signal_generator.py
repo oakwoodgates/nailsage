@@ -1,23 +1,43 @@
 """Signal generator that converts model predictions into trading signals.
 
 This module provides:
+- Multi-mode classification support (binary, 3-class, 5-class)
+- Automatic mode detection from prediction probabilities
 - Confidence-based filtering
 - Signal deduplication
 - Cooldown periods between signals
-- Position size calculation
+- Position size calculation (percentage of strategy bankroll)
 - Integration with StrategySignal format
+
+Classification Modes:
+    Binary (2-class): Aggressive trading, always in position
+        - Class 0 → Short (-1)
+        - Class 1 → Long (+1)
+
+    3-class: Standard mode, can stay flat
+        - Class 0 → Short (-1)
+        - Class 1 → Neutral (0)
+        - Class 2 → Long (+1)
+
+    5-class: Graduated confidence levels
+        - Class 0 → Strong Short (-1)
+        - Class 1 → Weak Short (-1)
+        - Class 2 → Neutral (0)
+        - Class 3 → Weak Long (+1)
+        - Class 4 → Strong Long (+1)
 
 Example usage:
     generator = SignalGenerator(
         strategy_name="momentum_classifier_v1",
         asset="BTC/USDT",
         confidence_threshold=0.6,
-        position_size_usd=10000.0,
+        position_size_pct=10.0,  # 10% of bankroll per trade
         cooldown_bars=4,
     )
 
-    # Convert prediction to signal
-    signal = generator.generate_signal(prediction)
+    # Convert prediction to signal (with current bankroll)
+    # Mode is auto-detected from prediction.probabilities
+    signal = generator.generate_signal(prediction, current_bankroll=9500.0)
 
     if signal:
         # Signal was generated (confidence threshold met, not duplicate)
@@ -30,7 +50,8 @@ from datetime import datetime
 from typing import Optional
 
 from execution.inference.predictor import Prediction
-from portfolio.signal import StrategySignal
+from execution.portfolio.signal import StrategySignal
+from training.signal_pipeline import SignalPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +64,7 @@ class SignalGeneratorConfig:
         strategy_name: Name of the strategy
         asset: Trading pair (e.g., 'BTC/USDT')
         confidence_threshold: Minimum confidence to generate signal (0.0-1.0)
-        position_size_usd: Position size in USD
+        position_size_pct: Position size as percentage of current bankroll (0-100)
         cooldown_bars: Minimum bars between signals (prevents spam)
         allow_neutral_signals: If True, emit neutral signals (close positions)
     """
@@ -51,7 +72,7 @@ class SignalGeneratorConfig:
     strategy_name: str
     asset: str
     confidence_threshold: float = 0.6
-    position_size_usd: float = 10000.0
+    position_size_pct: float = 10.0  # 10% of bankroll per trade
     cooldown_bars: int = 4
     allow_neutral_signals: bool = True
 
@@ -62,10 +83,10 @@ class SignalGeneratorConfig:
                 f"confidence_threshold must be between 0 and 1, "
                 f"got {self.confidence_threshold}"
             )
-        if self.position_size_usd <= 0:
+        if not 0.0 < self.position_size_pct <= 100.0:
             raise ValueError(
-                f"position_size_usd must be positive, "
-                f"got {self.position_size_usd}"
+                f"position_size_pct must be between 0 and 100, "
+                f"got {self.position_size_pct}"
             )
         if self.cooldown_bars < 0:
             raise ValueError(
@@ -100,6 +121,7 @@ class SignalGenerator:
             config: SignalGeneratorConfig instance
         """
         self.config = config
+        self.signal_pipeline = SignalPipeline(self._create_strategy_config())
         self._last_signal: Optional[int] = None  # -1, 0, 1
         self._last_signal_timestamp: Optional[int] = None  # Unix ms
         self._signals_generated: int = 0
@@ -109,9 +131,29 @@ class SignalGenerator:
             extra={
                 "asset": config.asset,
                 "confidence_threshold": config.confidence_threshold,
-                "position_size_usd": config.position_size_usd,
+                "position_size_pct": config.position_size_pct,
                 "cooldown_bars": config.cooldown_bars,
             }
+        )
+
+    def _create_strategy_config(self):
+        """Create a minimal StrategyConfig for the shared SignalPipeline."""
+        from config.strategy import StrategyConfig
+
+        # Create a minimal config with just the target settings we need
+        class MinimalConfig:
+            def __init__(self, confidence_threshold=0.0, classes=3):
+                self.target = type('Target', (), {
+                    'confidence_threshold': confidence_threshold,
+                    'classes': classes
+                })()
+                self.backtest = type('Backtest', (), {
+                    'min_bars_between_trades': 0
+                })()
+
+        return MinimalConfig(
+            confidence_threshold=self.config.confidence_threshold,
+            classes=3  # Default to 3-class, will be auto-detected
         )
 
     def generate_signal(
@@ -119,6 +161,7 @@ class SignalGenerator:
         prediction: Prediction,
         candle_interval_ms: int = 900000,  # 15 minutes default
         has_open_positions: bool = False,
+        current_bankroll: float = 10000.0,
     ) -> Optional[StrategySignal]:
         """
         Generate a trading signal from a prediction.
@@ -127,6 +170,7 @@ class SignalGenerator:
             prediction: Prediction from ModelPredictor
             candle_interval_ms: Interval between candles in milliseconds
             has_open_positions: True if there are currently open positions
+            current_bankroll: Current strategy bankroll in USD (for position sizing)
 
         Returns:
             StrategySignal if conditions met, None otherwise
@@ -138,20 +182,30 @@ class SignalGenerator:
         3. Cooldown period has elapsed since last signal
         4. If neutral signal, check allow_neutral_signals config
         """
-        # Convert prediction class to signal direction
-        signal_direction = self._prediction_to_signal(prediction.prediction)
+        # Use shared signal processing logic
+        # First check if neutral signals are allowed
+        if not self.config.allow_neutral_signals:
+            # Temporarily modify config for shared pipeline
+            original_threshold = self.signal_pipeline.config.target.confidence_threshold
+            self.signal_pipeline.config.target.confidence_threshold = 0.0  # Allow all signals through
+            # We'll filter neutral signals below
+            neutral_allowed = False
+        else:
+            neutral_allowed = True
 
-        # Check if neutral signals are allowed
-        if signal_direction == 0 and not self.config.allow_neutral_signals:
-            logger.info("❌ Signal suppressed: Neutral signal not allowed")
-            return None
+        # Convert prediction to signal using shared logic
+        import numpy as np
+        predictions_array = np.array([prediction.prediction])
+        probabilities_array = np.array([list(prediction.probabilities.values())])
 
-        # Check confidence threshold
-        if prediction.confidence < self.config.confidence_threshold:
-            logger.info(
-                f"❌ Signal suppressed: Confidence {prediction.confidence:.2%} "
-                f"< threshold {self.config.confidence_threshold:.2%}"
-            )
+        signals = self.signal_pipeline.convert_predictions_to_signals(
+            predictions_array, probabilities_array, num_classes=3
+        )
+        signal_direction = int(signals[0])
+
+        # Check if neutral signals are allowed (if we disabled them above)
+        if not neutral_allowed and signal_direction == 0:
+            logger.info("Signal suppressed: Neutral signal not allowed")
             return None
 
         # Check deduplication (same signal as last)
@@ -162,7 +216,7 @@ class SignalGenerator:
         if is_duplicate and not is_closing_signal:
             signal_name = {-1: "SHORT", 0: "NEUTRAL", 1: "LONG"}[signal_direction]
             logger.info(
-                f"❌ Signal suppressed: {signal_name} is duplicate of last signal"
+                f"Signal suppressed: {signal_name} is duplicate of last signal"
             )
             return None
 
@@ -179,10 +233,17 @@ class SignalGenerator:
                 candle_interval_ms
             )
             logger.info(
-                f"❌ Signal suppressed: Cooldown period "
+                f"Signal suppressed: Cooldown period "
                 f"({bars_since_last}/{self.config.cooldown_bars} bars elapsed)"
             )
             return None
+
+        # Restore original threshold if we modified it
+        if not neutral_allowed:
+            self.signal_pipeline.config.target.confidence_threshold = original_threshold
+
+        # Calculate position size as percentage of current bankroll
+        position_size_usd = current_bankroll * (self.config.position_size_pct / 100.0)
 
         # All checks passed - generate signal
         signal = StrategySignal(
@@ -191,7 +252,7 @@ class SignalGenerator:
             signal=signal_direction,
             confidence=prediction.confidence,
             timestamp=prediction.datetime,
-            position_size_usd=self.config.position_size_usd,
+            position_size_usd=position_size_usd,
         )
 
         # Update state
@@ -200,47 +261,20 @@ class SignalGenerator:
         self._signals_generated += 1
 
         logger.info(
-            f"✅ Generated signal #{self._signals_generated}: "
+            f"Generated signal #{self._signals_generated}: "
             f"{signal.direction_name.upper()} "
-            f"(confidence: {signal.confidence:.2%})",
+            f"(confidence: {signal.confidence:.2%}, size: ${position_size_usd:.2f})",
             extra={
                 "signal": signal_direction,
                 "confidence": prediction.confidence,
                 "timestamp": prediction.timestamp,
+                "position_size_usd": position_size_usd,
+                "bankroll": current_bankroll,
             }
         )
 
         return signal
 
-    def _prediction_to_signal(self, prediction_class: int) -> int:
-        """
-        Convert prediction class to signal direction.
-
-        Supports both binary and 3-class classification:
-        - Binary: 0=short, 1=long
-        - 3-class: 0=short, 1=neutral, 2=long
-
-        Args:
-            prediction_class: Prediction class (0, 1, or 2)
-
-        Returns:
-            Signal direction: -1=short, 0=neutral, 1=long
-        """
-        # Binary classification (2 classes)
-        if prediction_class in [0, 1]:
-            mapping = {
-                0: -1,  # short
-                1: 1,   # long
-            }
-            return mapping.get(prediction_class, 0)
-
-        # 3-class classification (fallback for legacy models)
-        mapping_3class = {
-            0: -1,  # short
-            1: 0,   # neutral
-            2: 1,   # long
-        }
-        return mapping_3class.get(prediction_class, 0)
 
     def _is_cooldown_elapsed(
         self,
@@ -308,4 +342,5 @@ class SignalGenerator:
             "strategy_name": self.config.strategy_name,
             "asset": self.config.asset,
             "confidence_threshold": self.config.confidence_threshold,
+            "position_size_pct": self.config.position_size_pct,
         }

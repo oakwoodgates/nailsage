@@ -67,16 +67,44 @@ List all strategies.
       "strategy_name": "btc_scalper",
       "version": "v1",
       "starlisting_id": 123,
+      "arena_id": 1,
       "interval": "15m",
       "model_id": "model_abc123",
       "is_active": true,
+      "initial_bankroll": 10000.00,
+      "current_bankroll": 9500.00,
       "created_at": 1700000000000,
-      "updated_at": 1700000000000
+      "updated_at": 1700000000000,
+      "arena": {
+        "id": 1,
+        "starlisting_id": 123,
+        "trading_pair": "BTC/USD",
+        "interval": "15m",
+        "coin": "BTC",
+        "coin_name": "Bitcoin",
+        "quote": "USD",
+        "quote_name": "US Dollar",
+        "exchange": "hyperliquid",
+        "exchange_name": "Hyperliquid",
+        "market_type": "perps",
+        "market_name": "Perpetuals"
+      }
     }
   ],
   "total": 1
 }
 ```
+
+#### GET /api/v1/strategies/by-arena/{arena_id}
+
+Get strategies for a specific arena.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| active_only | boolean | true | Filter to active strategies only |
+
+**Response:** Same structure as `/api/v1/strategies` - list of strategies filtered by arena.
 
 #### GET /api/v1/strategies/{id}
 
@@ -89,11 +117,28 @@ Get strategy by ID.
   "strategy_name": "btc_scalper",
   "version": "v1",
   "starlisting_id": 123,
+  "arena_id": 1,
   "interval": "15m",
   "model_id": "model_abc123",
   "is_active": true,
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
   "created_at": 1700000000000,
-  "updated_at": 1700000000000
+  "updated_at": 1700000000000,
+  "arena": {
+    "id": 1,
+    "starlisting_id": 123,
+    "trading_pair": "BTC/USD",
+    "interval": "15m",
+    "coin": "BTC",
+    "coin_name": "Bitcoin",
+    "quote": "USD",
+    "quote_name": "US Dollar",
+    "exchange": "hyperliquid",
+    "exchange_name": "Hyperliquid",
+    "market_type": "perps",
+    "market_name": "Perpetuals"
+  }
 }
 ```
 
@@ -111,6 +156,8 @@ Get strategy with performance statistics.
   "interval": "15m",
   "model_id": "model_abc123",
   "is_active": true,
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
   "created_at": 1700000000000,
   "updated_at": 1700000000000,
   "total_trades": 150,
@@ -149,6 +196,268 @@ Get positions for a specific strategy.
 | limit | integer | 100 | Number of positions (1-1000) |
 | offset | integer | 0 | Pagination offset |
 
+#### GET /api/v1/strategies/{id}/bankroll
+
+Get current bankroll for a strategy.
+
+**Response:**
+```json
+{
+  "strategy_id": 1,
+  "strategy_name": "btc_scalper",
+  "initial_bankroll": 10000.00,
+  "current_bankroll": 9500.00,
+  "pnl": -500.00,
+  "pnl_pct": -5.0,
+  "is_active": true
+}
+```
+
+**Response Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `strategy_id` | integer | Strategy ID |
+| `strategy_name` | string | Strategy name |
+| `initial_bankroll` | float | Starting capital (USDT) |
+| `current_bankroll` | float | Current capital after P&L (USDT) |
+| `pnl` | float | Total P&L (current - initial) |
+| `pnl_pct` | float | P&L as percentage |
+| `is_active` | boolean | Whether strategy can trade (bankroll > 0) |
+
+#### PATCH /api/v1/strategies/{id}/bankroll
+
+Update/replenish strategy bankroll. Use this endpoint to manually adjust a strategy's bankroll, such as replenishing a depleted strategy.
+
+**Request Body:**
+```json
+{
+  "bankroll": 15000.00
+}
+```
+
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `bankroll` | float | Yes | New bankroll value (USDT), must be > 0 |
+
+**Response:** Same as GET /api/v1/strategies/{id}/bankroll
+
+**Example: Replenish a depleted strategy**
+```bash
+curl -X PATCH http://localhost:8000/api/v1/strategies/1/bankroll \
+  -H "Content-Type: application/json" \
+  -d '{"bankroll": 10000.00}'
+```
+
+---
+
+### Arenas
+
+Trading arenas represent unique combinations of exchange, trading pair, and interval. Arena data is synced from the Kirby API and cached locally.
+
+#### GET /api/v1/arenas
+
+List all arenas.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| active_only | boolean | true | Filter to active arenas only |
+| exchange_id | integer | null | Filter by exchange ID |
+| coin_id | integer | null | Filter by coin (base asset) ID |
+
+**Response:**
+```json
+{
+  "arenas": [
+    {
+      "id": 1,
+      "starlisting_id": 123,
+      "trading_pair": "BTC/USD",
+      "trading_pair_id": 1,
+      "coin": {
+        "id": 1,
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "quote": {
+        "id": 2,
+        "symbol": "USD",
+        "name": "US Dollar"
+      },
+      "exchange": {
+        "id": 1,
+        "slug": "hyperliquid",
+        "name": "Hyperliquid"
+      },
+      "market_type": {
+        "id": 1,
+        "type": "perps",
+        "name": "Perpetuals"
+      },
+      "interval": "15m",
+      "interval_seconds": 900,
+      "is_active": true,
+      "last_synced_at": 1700000000000,
+      "created_at": 1700000000000,
+      "updated_at": 1700000000000,
+      "strategies": [1, 2]
+    }
+  ],
+  "total": 1
+}
+```
+
+**Note:** The `strategies` field contains an array of active strategy IDs that are using this arena.
+
+#### GET /api/v1/arenas/{id}
+
+Get arena by ID.
+
+**Response:** Same structure as arena object above.
+
+#### GET /api/v1/arenas/by-starlisting/{starlisting_id}
+
+Get arena by Kirby starlisting ID.
+
+**Response:** Same structure as arena object above.
+
+#### GET /api/v1/arenas/popular
+
+List arenas ranked by number of strategies using them.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| limit | integer | 10 | Max arenas to return (1-100) |
+
+**Response:**
+```json
+{
+  "arenas": [
+    {
+      "id": 1,
+      "starlisting_id": 123,
+      "trading_pair": "BTC/USD",
+      "trading_pair_id": 1,
+      "coin": {
+        "id": 1,
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "quote": {
+        "id": 2,
+        "symbol": "USD",
+        "name": "US Dollar"
+      },
+      "exchange": {
+        "id": 1,
+        "slug": "hyperliquid",
+        "name": "Hyperliquid"
+      },
+      "market_type": {
+        "id": 1,
+        "type": "perps",
+        "name": "Perpetuals"
+      },
+      "interval": "15m",
+      "interval_seconds": 900,
+      "is_active": true,
+      "last_synced_at": 1700000000000,
+      "created_at": 1700000000000,
+      "updated_at": 1700000000000,
+      "strategies": [1, 2, 3, 4, 5],
+      "strategy_count": 5
+    }
+  ],
+  "total": 1
+}
+```
+
+**Note:** In addition to `strategy_count`, this endpoint also returns `strategies` containing the actual IDs of active strategies using this arena.
+
+#### POST /api/v1/arenas/sync
+
+Sync arena metadata from Kirby API. Creates or updates local arena record.
+
+**Request Body:**
+```json
+{
+  "starlisting_id": 123
+}
+```
+
+**Response:**
+```json
+{
+  "arena": { ... },
+  "created": true
+}
+```
+
+---
+
+### Lookup Tables
+
+#### GET /api/v1/exchanges
+
+List all exchanges.
+
+**Response:**
+```json
+{
+  "exchanges": [
+    {
+      "id": 1,
+      "slug": "hyperliquid",
+      "name": "Hyperliquid"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### GET /api/v1/coins
+
+List all coins/assets.
+
+**Response:**
+```json
+{
+  "coins": [
+    {
+      "id": 1,
+      "symbol": "BTC",
+      "name": "Bitcoin"
+    },
+    {
+      "id": 2,
+      "symbol": "USD",
+      "name": "US Dollar"
+    }
+  ],
+  "total": 2
+}
+```
+
+#### GET /api/v1/market-types
+
+List all market types.
+
+**Response:**
+```json
+{
+  "market_types": [
+    {
+      "id": 1,
+      "type": "perps",
+      "name": "Perpetuals"
+    }
+  ],
+  "total": 1
+}
+```
+
 ---
 
 ### Trades
@@ -182,7 +491,8 @@ List trades with optional filtering.
       "signal_id": 1,
       "created_at": 1700000000000,
       "strategy_name": "btc_scalper",
-      "position_side": "long"
+      "position_side": "long",
+      "arena_id": 1
     }
   ],
   "total": 1,

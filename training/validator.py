@@ -1,0 +1,267 @@
+"""Validation orchestration for training pipelines."""
+
+import logging
+from typing import Dict, Any, Optional
+
+import numpy as np
+import pandas as pd
+
+from config.backtest import BacktestConfig
+from config.strategy import StrategyConfig
+from training.validation.time_series_split import TimeSeriesSplitter
+from training.validation.backtest import BacktestEngine
+from utils.logger import get_training_logger
+
+logger = get_training_logger()
+
+
+class Validator:
+    """
+    Orchestrates model validation using walk-forward analysis.
+
+    This class handles the complete validation pipeline:
+    - Time series splitting
+    - Walk-forward validation across splits
+    - Backtesting on each split
+    - Aggregate metrics calculation
+
+    Attributes:
+        config: Strategy configuration
+        splitter: Time series splitter for validation
+        backtest_config: Backtesting configuration
+    """
+
+    def __init__(self, config: StrategyConfig):
+        """
+        Initialize validator.
+
+        Args:
+            config: Strategy configuration
+        """
+        self.config = config
+
+        # Create validation configuration
+        validation_config = config.validation
+        if validation_config is None:
+            method = 'walk_forward'
+            n_splits = 4
+            expanding_window = True
+            gap_bars = 4
+        else:
+            method = getattr(validation_config, 'method', 'walk_forward')
+            n_splits = getattr(validation_config, 'n_splits', 4)
+            expanding_window = getattr(validation_config, 'expanding_window', True)
+            gap_bars = getattr(validation_config, 'gap_bars', 4)
+
+        # Create time series splitter
+        self.splitter = TimeSeriesSplitter(
+            n_splits=n_splits,
+            expanding_window=expanding_window,
+            gap_bars=gap_bars,
+        )
+
+        # Create backtest configuration
+        self.backtest_config = self._create_backtest_config()
+
+        logger.info(f"Initialized Validator with {n_splits} splits, {method} method")
+
+    def _create_backtest_config(self) -> BacktestConfig:
+        """Create backtest configuration from strategy config."""
+        if not self.config.backtest:
+            # Default backtest config
+            return BacktestConfig()
+
+        return BacktestConfig(
+            initial_capital=self.config.backtest.capital,
+            taker_fee=self.config.backtest.transaction_cost_pct / 100.0,
+            slippage_bps=self.config.backtest.slippage_bps,
+            enable_leverage=self.config.backtest.leverage > 1,
+            max_leverage=float(self.config.backtest.leverage),
+        )
+
+    def run_validation(
+        self,
+        model,
+        df_clean: pd.DataFrame,
+        target_clean: pd.Series,
+        feature_cols: list
+    ) -> Dict[str, Any]:
+        """
+        Run complete walk-forward validation.
+
+        Args:
+            model: Trained model
+            df_clean: Cleaned feature DataFrame
+            target_clean: Cleaned target series
+            feature_cols: Feature column names
+
+        Returns:
+            Validation results dictionary
+        """
+        logger.info("="*70)
+        logger.info("RUNNING WALK-FORWARD VALIDATION")
+        logger.info("="*70)
+
+        # Generate splits
+        splits = self.splitter.split(df_clean, timestamp_column='timestamp')
+        logger.info(f"Generated {len(splits)} validation splits")
+
+        # Run validation on each split
+        split_results = []
+        for split in splits:
+            logger.info(f"\n{'='*70}")
+            logger.info(f"Split {split.split_index + 1}/{len(splits)}")
+            logger.info(f"{'='*70}")
+
+            split_result = self._validate_single_split(
+                model, df_clean, target_clean, feature_cols, split
+            )
+            split_results.append(split_result)
+
+        # Calculate aggregate metrics
+        aggregate_results = self._calculate_aggregate_metrics(split_results)
+
+        validation_results = {
+            'n_splits': len(split_results),
+            'splits': split_results,
+            'aggregate': aggregate_results,
+        }
+
+        # Log aggregate results
+        self._log_aggregate_results(aggregate_results)
+
+        return validation_results
+
+    def _validate_single_split(
+        self,
+        model,
+        df_clean: pd.DataFrame,
+        target_clean: pd.Series,
+        feature_cols: list,
+        split
+    ) -> Dict[str, Any]:
+        """Validate model on a single split."""
+        # Get train/val indices for this split
+        train_idx, val_idx = self.splitter.get_train_val_indices(
+            df_clean, split, timestamp_column='timestamp'
+        )
+
+        X_split_val = df_clean.iloc[val_idx][feature_cols]
+        y_split_val = target_clean.iloc[val_idx]
+
+        logger.info(f"Split validation samples: {len(X_split_val):,}")
+
+        # Generate predictions
+        predictions = model.predict(X_split_val)
+        probabilities = model.predict_proba(X_split_val) if hasattr(model, 'predict_proba') else None
+
+        # Calculate accuracy
+        val_acc = float((predictions == y_split_val).mean())
+        logger.info(f"Validation accuracy: {val_acc:.4f}")
+
+        # Convert to signals and run backtest
+        signals = self._convert_to_signals_with_config(predictions, probabilities)
+        backtest_metrics = self._run_backtest_on_split(df_clean.iloc[val_idx], signals)
+
+        # Log split results
+        logger.info("Split Results:")
+        logger.info(f"  Accuracy: {val_acc:.4f}")
+        logger.info(f"  Total Return: {backtest_metrics.total_return * 100:.2f}%")
+        logger.info(f"  Sharpe Ratio: {backtest_metrics.sharpe_ratio:.2f}")
+        logger.info(f"  Max Drawdown: {backtest_metrics.max_drawdown * 100:.2f}%")
+        logger.info(f"  Win Rate: {backtest_metrics.win_rate * 100:.2f}%")
+        logger.info(f"  Total Trades: {backtest_metrics.total_trades}")
+
+        return {
+            'split': split.split_index + 1,
+            'period': {
+                'start': str(split.val_start),
+                'end': str(split.val_end)
+            },
+            'val_metrics': {
+                'accuracy': val_acc,
+            },
+            'backtest_metrics': {
+                'total_return': float(backtest_metrics.total_return),
+                'annual_return': float(backtest_metrics.annual_return),
+                'sharpe_ratio': float(backtest_metrics.sharpe_ratio),
+                'sortino_ratio': float(backtest_metrics.sortino_ratio),
+                'max_drawdown': float(backtest_metrics.max_drawdown),
+                'win_rate': float(backtest_metrics.win_rate),
+                'total_trades': int(backtest_metrics.total_trades),
+                'profit_factor': float(backtest_metrics.profit_factor),
+            }
+        }
+
+    def _convert_to_signals_with_config(
+        self,
+        predictions: np.ndarray,
+        probabilities: Optional[np.ndarray]
+    ) -> pd.Series:
+        """Convert predictions to signals using configuration."""
+        from training.signal_pipeline import SignalPipeline
+
+        signal_pipeline = SignalPipeline(self.config)
+        num_classes = self.config.target.classes or 3
+
+        signals = signal_pipeline.process_signals_for_backtest(
+            predictions, probabilities, num_classes
+        )
+
+        # Convert to pandas Series (expected by BacktestEngine)
+        return pd.Series(signals)
+
+    def _run_backtest_on_split(self, df_split: pd.DataFrame, signals: pd.Series):
+        """Run backtest on a single split."""
+        backtest_engine = BacktestEngine(self.backtest_config)
+        metrics = backtest_engine.run(df_split, signals, price_column="close")
+        return metrics
+
+    def _calculate_aggregate_metrics(self, split_results: list) -> Dict[str, Any]:
+        """Calculate aggregate metrics across all splits."""
+        if not split_results:
+            return {}
+
+        # Extract metrics
+        val_accuracies = [r['val_metrics']['accuracy'] for r in split_results]
+        total_returns = [r['backtest_metrics']['total_return'] for r in split_results]
+        sharpe_ratios = [r['backtest_metrics']['sharpe_ratio'] for r in split_results]
+        max_drawdowns = [r['backtest_metrics']['max_drawdown'] for r in split_results]
+        win_rates = [r['backtest_metrics']['win_rate'] for r in split_results]
+        total_trades = sum([r['backtest_metrics']['total_trades'] for r in split_results])
+
+        # Calculate aggregates
+        avg_val_acc = float(np.mean(val_accuracies))
+        avg_return = float(np.mean(total_returns))
+        avg_sharpe = float(np.mean(sharpe_ratios))
+        avg_max_dd = float(np.mean(max_drawdowns))
+        avg_win_rate = float(np.mean(win_rates))
+
+        positive_splits = sum(1 for r in split_results if r['backtest_metrics']['total_return'] > 0)
+        consistency_pct = positive_splits / len(split_results)
+
+        return {
+            'avg_val_accuracy': avg_val_acc,
+            'avg_total_return': avg_return,
+            'avg_sharpe_ratio': avg_sharpe,
+            'avg_max_drawdown': avg_max_dd,
+            'avg_win_rate': avg_win_rate,
+            'total_trades': int(total_trades),
+            'positive_splits': int(positive_splits),
+            'consistency_pct': float(consistency_pct),
+        }
+
+    def _log_aggregate_results(self, aggregate: Dict[str, Any]) -> None:
+        """Log aggregate validation results."""
+        logger.info(f"\n{'='*70}")
+        logger.info("AGGREGATE VALIDATION RESULTS")
+        logger.info(f"{'='*70}")
+
+        logger.info(f"Average Validation Accuracy: {aggregate['avg_val_accuracy']:.4f}")
+        logger.info(f"Average Total Return: {aggregate['avg_total_return'] * 100:.2f}%")
+        logger.info(f"Average Sharpe Ratio: {aggregate['avg_sharpe_ratio']:.2f}")
+        logger.info(f"Average Max Drawdown: {aggregate['avg_max_drawdown'] * 100:.2f}%")
+        logger.info(f"Average Win Rate: {aggregate['avg_win_rate'] * 100:.2f}%")
+        logger.info(f"Total Trades (all splits): {aggregate['total_trades']}")
+        logger.info(f"Consistency: {aggregate['consistency_pct'] * 100:.1f}% ({aggregate['positive_splits']}/{len([]) if not hasattr(self, 'splitter') else self.splitter.n_splits} splits profitable)")
+        logger.info(f"{'='*70}")

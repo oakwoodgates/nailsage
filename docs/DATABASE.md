@@ -2,7 +2,7 @@
 
 **NailSage Paper Trading State Persistence**
 
-**Last Updated**: 2025-11-27
+**Last Updated**: 2025-12-03
 
 ---
 
@@ -97,7 +97,7 @@ services:
 
 ### **1. strategies**
 
-Tracks active and historical trading strategies.
+Tracks active and historical trading strategies with isolated bankroll management.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -109,8 +109,17 @@ Tracks active and historical trading strategies.
 | `model_id` | VARCHAR/TEXT | NailSage model ID from model registry |
 | `config_path` | TEXT | Path to strategy YAML config |
 | `is_active` | BOOLEAN | Whether strategy is currently running |
+| `initial_bankroll` | REAL | Starting capital for this strategy (USDT), default: 10000.0 |
+| `current_bankroll` | REAL | Current capital after P&L (USDT), default: 10000.0 |
 | `created_at` | BIGINT | Unix timestamp (milliseconds) |
 | `updated_at` | BIGINT | Unix timestamp (milliseconds) |
+
+**Bankroll Behavior:**
+- Each strategy gets an isolated $10,000 bankroll by default
+- Position sizes are calculated as a percentage (default 10%) of `current_bankroll`
+- After each trade closes, `current_bankroll` is updated with the realized P&L
+- If `current_bankroll <= 0`, the strategy cannot open new trades (but can close existing positions)
+- Use the API `PATCH /api/v1/strategies/{id}/bankroll` endpoint to replenish a depleted bankroll
 
 **Indexes:**
 - `idx_strategies_active` on `is_active`
@@ -415,7 +424,7 @@ from execution.persistence.state_manager import StateManager, Strategy, Position
 # Initialize (auto-detects SQLite or PostgreSQL from DATABASE_URL)
 state = StateManager()
 
-# Save a strategy
+# Save a strategy (with default $10,000 bankroll)
 strategy = Strategy(
     id=None,
     strategy_name="dev_scalper_1m",
@@ -423,10 +432,15 @@ strategy = Strategy(
     starlisting_id=12345,
     interval="1m",
     model_id="nailsage-momentum-20251127-123456",
-    config_path="configs/strategies/dev_scalper_1m_v1.yaml",
+    config_path="strategies/dev_scalper_1m_v1.yaml",
     is_active=True,
+    initial_bankroll=10000.0,  # Starting capital (USDT)
+    current_bankroll=10000.0,  # Current capital after P&L (USDT)
 )
 strategy_id = state.save_strategy(strategy)
+
+# Update bankroll after a trade closes
+state.update_strategy_bankroll(strategy_id, new_bankroll=9850.0)  # Lost $150
 
 # Get open positions
 open_positions = state.get_open_positions(strategy_id=strategy_id)

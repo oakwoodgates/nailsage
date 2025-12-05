@@ -5,6 +5,8 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from api.schemas.common import TimestampMixin
+from api.schemas.models import ModelSummary
+from api.schemas.arenas import ArenaSummary
 
 
 class StrategyBase(BaseModel):
@@ -13,15 +15,19 @@ class StrategyBase(BaseModel):
     strategy_name: str = Field(description="Strategy name")
     version: str = Field(description="Strategy version")
     starlisting_id: int = Field(description="Kirby starlisting ID")
+    arena_id: Optional[int] = Field(None, description="Arena ID (Nailsage internal)")
     interval: str = Field(description="Trading interval (1m, 15m, 4h, etc.)")
     model_id: Optional[str] = Field(None, description="ML model identifier")
     is_active: bool = Field(default=True, description="Whether strategy is active")
+    initial_bankroll: float = Field(default=10000.0, description="Initial capital for this strategy (USDT)")
+    current_bankroll: float = Field(default=10000.0, description="Current capital after P&L (USDT)")
 
 
 class StrategyResponse(StrategyBase, TimestampMixin):
     """Strategy response with all fields."""
 
     id: int = Field(description="Strategy ID")
+    arena: Optional[ArenaSummary] = Field(None, description="Arena metadata (if loaded)")
 
     model_config = {"from_attributes": True}
 
@@ -50,8 +56,32 @@ class StrategyWithStats(StrategyResponse):
     profit_factor: float = Field(default=0.0, description="Profit factor (gross profit / gross loss)")
 
 
+class StrategyWithModel(StrategyResponse):
+    """Strategy response with active model metadata embedded."""
+
+    model: Optional[ModelSummary] = Field(None, description="Active model for this strategy")
+
+
 class StrategyListResponse(BaseModel):
     """Response for strategy list endpoint."""
 
     strategies: List[StrategyResponse] = Field(description="List of strategies")
     total: int = Field(description="Total number of strategies")
+
+
+class BankrollResponse(BaseModel):
+    """Response for bankroll endpoint."""
+
+    strategy_id: int = Field(description="Strategy ID")
+    strategy_name: str = Field(description="Strategy name")
+    initial_bankroll: float = Field(description="Initial capital (USDT)")
+    current_bankroll: float = Field(description="Current capital after P&L (USDT)")
+    pnl: float = Field(description="Total P&L (current - initial)")
+    pnl_pct: float = Field(description="P&L percentage")
+    is_active: bool = Field(description="Whether strategy can trade (bankroll > 0)")
+
+
+class BankrollUpdateRequest(BaseModel):
+    """Request to update strategy bankroll."""
+
+    bankroll: float = Field(description="New bankroll value (USDT)", gt=0)

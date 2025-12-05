@@ -13,10 +13,10 @@ This document tracks which files are currently in use, which have been deprecate
 
 | File | Purpose | Used By | Status |
 |------|---------|---------|--------|
-| [scripts/run_multi_strategy.py](../scripts/run_multi_strategy.py) | **PRIMARY ENTRY POINT** - Multi-strategy paper trading for Docker | Docker containers | ✅ **ACTIVE** |
-| [scripts/train_model.py](../scripts/train_model.py) | Generic model training with walk-forward validation | Manual training | ✅ **ACTIVE** |
-| [scripts/validate_model.py](../scripts/validate_model.py) | Standalone model validation | Manual validation | ✅ **ACTIVE** |
-| [scripts/run_backtest.py](../scripts/run_backtest.py) | Quick backtesting | Manual backtesting | ✅ **ACTIVE** |
+| [execution/cli/run_multi_strategy.py](../execution/cli/run_multi_strategy.py) | **PRIMARY ENTRY POINT** - Multi-strategy paper trading for Docker | Docker containers | ✅ **ACTIVE** |
+| [training/cli/train_model.py](../training/cli/train_model.py) | Generic model training with walk-forward validation | Manual training | ✅ **ACTIVE** |
+| [training/cli/validate_model.py](../training/cli/validate_model.py) | Standalone model validation | Manual validation | ✅ **ACTIVE** |
+| [training/cli/run_backtest.py](../training/cli/run_backtest.py) | Quick backtesting | Manual backtesting | ✅ **ACTIVE** |
 
 ### Core Execution Modules (Active)
 
@@ -47,8 +47,8 @@ These files have been **DELETED** and should not be referenced in new code or do
 | File | Removed Date | Reason | Replacement |
 |------|--------------|--------|-------------|
 | `execution/runner/live_strategy_refactored.py` | 2025-11-26 | Renamed to remove "refactored" suffix | [execution/runner/live_strategy.py](../execution/runner/live_strategy.py) |
-| `scripts/run_paper_trading.py` | 2025-11-26 | Single-strategy runner deprecated in favor of multi-strategy | [scripts/run_multi_strategy.py](../scripts/run_multi_strategy.py) |
-| `scripts/run_sol_paper_trading.py` | 2025-11-26 | Duplicate of run_paper_trading.py for SOL | [scripts/run_multi_strategy.py](../scripts/run_multi_strategy.py) |
+| `scripts/run_paper_trading.py` | 2025-11-26 | Single-strategy runner deprecated in favor of multi-strategy | [execution/cli/run_multi_strategy.py](../execution/cli/run_multi_strategy.py) |
+| `scripts/run_sol_paper_trading.py` | 2025-11-26 | Duplicate of run_paper_trading.py for SOL | [execution/cli/run_multi_strategy.py](../execution/cli/run_multi_strategy.py) |
 
 ### Deprecated Documentation
 
@@ -81,7 +81,7 @@ These files have been **DELETED** and should not be referenced in new code or do
   - Easier to extend (e.g., risk management)
 
 ### Phase 3: Multi-Strategy Execution (Current)
-- **File**: `scripts/run_multi_strategy.py`
+- **File**: `execution/cli/run_multi_strategy.py`
 - **Structure**:
   - Single WebSocket connection per exchange
   - Shared candle buffer across strategies
@@ -102,11 +102,11 @@ All models use the **same training infrastructure** with strategy-specific YAML 
 
 | Script | Purpose |
 |--------|---------|
-| [scripts/train_model.py](../scripts/train_model.py) | Generic training + walk-forward validation |
-| [scripts/validate_model.py](../scripts/validate_model.py) | Standalone validation |
-| [scripts/run_backtest.py](../scripts/run_backtest.py) | Quick backtesting |
+| [training/cli/train_model.py](../training/cli/train_model.py) | Generic training + walk-forward validation |
+| [training/cli/validate_model.py](../training/cli/validate_model.py) | Standalone validation |
+| [training/cli/run_backtest.py](../training/cli/run_backtest.py) | Quick backtesting |
 
-**Configuration**: `configs/strategies/*.yaml`
+**Configuration**: `strategies/*.yaml`
 
 **Benefits**:
 - One bug fix benefits all strategies
@@ -118,8 +118,7 @@ All models use the **same training infrastructure** with strategy-specific YAML 
 **Status**: ⚠️ **DEPRECATED** (See [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md) deprecation notice)
 
 Old approach used per-strategy training scripts:
-- `strategies/short_term/train_btc_momentum.py`
-- `strategies/long_term/train_sol_swing.py`
+- Training handled by `training/cli/train_model.py` with YAML configs
 
 These are kept for reference but **should not be used for new strategies**.
 
@@ -129,7 +128,7 @@ These are kept for reference but **should not be used for new strategies**.
 
 ```
 nailsage/
-├── configs/strategies/        # Strategy YAML configs (✅ ACTIVE)
+├── strategies/         # Strategy YAML configs (✅ ACTIVE)
 ├── execution/
 │   ├── runner/
 │   │   ├── live_strategy.py   # Main orchestrator (✅ ACTIVE)
@@ -146,7 +145,6 @@ nailsage/
 │   ├── train_model.py         # Generic training (✅ ACTIVE)
 │   ├── validate_model.py      # Validation (✅ ACTIVE)
 │   └── run_backtest.py        # Backtesting (✅ ACTIVE)
-├── strategies/                # Legacy strategy-specific code (⚠️ DEPRECATED)
 └── docs/
     ├── ACTIVE_FILES.md        # This file (✅ ACTIVE)
     ├── DATABASE.md            # Database schema and usage (✅ ACTIVE)
@@ -167,8 +165,8 @@ nailsage/
 
 ### "I need to add a new strategy" → What do I do?
 
-1. Create YAML config in `configs/strategies/my_strategy_v1.yaml`
-2. Train: `python scripts/train_model.py --config configs/strategies/my_strategy_v1.yaml`
+1. Create YAML config in `strategies/my_strategy_v1.yaml`
+2. Train: `python training/cli/train_model.py --config strategies/my_strategy_v1.yaml`
 3. Deploy: Update `docker-compose.yml` environment variables
 4. See [MODEL_TRAINING.md](MODEL_TRAINING.md) for details
 
@@ -193,7 +191,7 @@ docker logs -f nailsage-binance
 
 **Local (Testing)**:
 ```bash
-python scripts/run_multi_strategy.py
+python execution/cli/run_multi_strategy.py
 ```
 
 ---

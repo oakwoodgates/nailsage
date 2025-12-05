@@ -202,7 +202,7 @@ docker compose build nailsage-binance && docker compose up -d nailsage-binance
 
 **No Rebuild Needed** (volume-mounted files):
 - Model files in `models/trained/` or `models/metadata/`
-- Strategy configs in `configs/strategies/` (YAML files)
+- Strategy configs in `strategies/` (YAML files)
 - Data files in `data/raw/`
 - `.env` file changes
 - `docker-compose.yml` changes
@@ -252,14 +252,14 @@ docker compose restart nailsage-binance
 
 1. **Create strategy config**:
    ```bash
-   # Create configs/strategies/btc_scalp_v1.yaml
+   # Create strategies/btc_scalp_v1.yaml
    # (no rebuild needed - volume mounted)
    ```
 
 2. **Train and register model**:
    ```bash
    # Train locally (outside Docker)
-   python scripts/train_strategy.py configs/strategies/btc_scalp_v1.yaml
+   python scripts/train_strategy.py strategies/btc_scalp_v1.yaml
 
    # Model artifacts automatically available to container via volume mount
    ```
@@ -575,7 +575,7 @@ services:
   nailsage-binance:
     build: .
     container_name: nailsage-binance
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["sh", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
     env_file: /opt/nailsage/secrets/.env
     environment:
       EXCHANGE: binance

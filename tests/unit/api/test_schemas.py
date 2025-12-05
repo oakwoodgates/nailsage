@@ -4,7 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from api.schemas.common import PaginationParams, PaginatedResponse, ErrorResponse
-from api.schemas.strategies import StrategyResponse, StrategyWithStats
+from api.schemas.strategies import StrategyResponse, StrategyWithStats, BankrollResponse, BankrollUpdateRequest
+from api.schemas.arenas import ArenaSummary
 from api.schemas.trades import TradeResponse
 from api.schemas.positions import PositionResponse
 from api.schemas.portfolio import PortfolioSummary, AllocationItem
@@ -77,6 +78,57 @@ class TestStrategyResponse:
         )
         assert strategy.model_id is None
 
+    def test_optional_arena(self):
+        """Test arena is optional."""
+        strategy = StrategyResponse(
+            id=1,
+            strategy_name="test",
+            version="v1",
+            starlisting_id=123,
+            interval="1m",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+        )
+        assert strategy.arena is None
+        assert strategy.arena_id is None
+
+    def test_with_arena(self):
+        """Test strategy with arena summary."""
+        arena = ArenaSummary(
+            id=1,
+            starlisting_id=123,
+            trading_pair="BTC/USD",
+            interval="15m",
+            coin="BTC",
+            coin_name="Bitcoin",
+            quote="USD",
+            quote_name="US Dollar",
+            exchange="hyperliquid",
+            exchange_name="Hyperliquid",
+            market_type="perps",
+            market_name="Perpetuals",
+        )
+        strategy = StrategyResponse(
+            id=1,
+            strategy_name="test",
+            version="v1",
+            starlisting_id=123,
+            arena_id=1,
+            interval="15m",
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+            arena=arena,
+        )
+        assert strategy.arena_id == 1
+        assert strategy.arena is not None
+        assert strategy.arena.trading_pair == "BTC/USD"
+        assert strategy.arena.coin == "BTC"
+        assert strategy.arena.coin_name == "Bitcoin"
+        assert strategy.arena.exchange == "hyperliquid"
+        assert strategy.arena.exchange_name == "Hyperliquid"
+
 
 class TestStrategyWithStats:
     """Tests for StrategyWithStats schema."""
@@ -139,6 +191,43 @@ class TestTradeResponse:
         assert trade.id == 1
         assert trade.trade_type == "open_long"
         assert trade.size == 1000.0
+
+    def test_trade_with_arena_id(self):
+        """Test trade response with arena_id."""
+        trade = TradeResponse(
+            id=1,
+            position_id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            trade_type="open_long",
+            size=1000.0,
+            price=50000.0,
+            fees=1.0,
+            slippage=0.5,
+            timestamp=1700000000000,
+            arena_id=1,
+            strategy_name="test_strategy",
+            position_side="long",
+        )
+        assert trade.arena_id == 1
+        assert trade.strategy_name == "test_strategy"
+        assert trade.position_side == "long"
+
+    def test_trade_without_arena_id(self):
+        """Test trade response without arena_id (null)."""
+        trade = TradeResponse(
+            id=1,
+            position_id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            trade_type="close_short",
+            size=500.0,
+            price=48000.0,
+            fees=0.5,
+            slippage=0.25,
+            timestamp=1700000000000,
+        )
+        assert trade.arena_id is None
 
 
 class TestPositionResponse:
@@ -263,3 +352,74 @@ class TestWebSocketSchemas:
         )
         assert message.type == "trade.new"
         assert message.channel == "trades"
+
+
+class TestBankrollSchemas:
+    """Tests for Bankroll schemas."""
+
+    def test_bankroll_response_profitable(self):
+        """Test bankroll response with profit."""
+        response = BankrollResponse(
+            strategy_id=1,
+            strategy_name="test_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=12000.0,
+            pnl=2000.0,
+            pnl_pct=20.0,
+            is_active=True,
+        )
+        assert response.strategy_id == 1
+        assert response.initial_bankroll == 10000.0
+        assert response.current_bankroll == 12000.0
+        assert response.pnl == 2000.0
+        assert response.pnl_pct == 20.0
+        assert response.is_active is True
+
+    def test_bankroll_response_loss(self):
+        """Test bankroll response with loss."""
+        response = BankrollResponse(
+            strategy_id=2,
+            strategy_name="losing_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=7500.0,
+            pnl=-2500.0,
+            pnl_pct=-25.0,
+            is_active=True,
+        )
+        assert response.pnl == -2500.0
+        assert response.pnl_pct == -25.0
+        assert response.is_active is True
+
+    def test_bankroll_response_depleted(self):
+        """Test bankroll response when depleted (inactive)."""
+        response = BankrollResponse(
+            strategy_id=3,
+            strategy_name="depleted_strategy",
+            initial_bankroll=10000.0,
+            current_bankroll=0.0,
+            pnl=-10000.0,
+            pnl_pct=-100.0,
+            is_active=False,
+        )
+        assert response.current_bankroll == 0.0
+        assert response.is_active is False
+
+    def test_bankroll_update_request_valid(self):
+        """Test valid bankroll update request."""
+        request = BankrollUpdateRequest(bankroll=15000.0)
+        assert request.bankroll == 15000.0
+
+    def test_bankroll_update_request_minimum(self):
+        """Test bankroll update with small positive value."""
+        request = BankrollUpdateRequest(bankroll=0.01)
+        assert request.bankroll == 0.01
+
+    def test_bankroll_update_request_zero_invalid(self):
+        """Test bankroll update with zero is invalid."""
+        with pytest.raises(ValidationError):
+            BankrollUpdateRequest(bankroll=0)
+
+    def test_bankroll_update_request_negative_invalid(self):
+        """Test bankroll update with negative value is invalid."""
+        with pytest.raises(ValidationError):
+            BankrollUpdateRequest(bankroll=-1000.0)

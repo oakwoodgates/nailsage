@@ -49,6 +49,7 @@ services:
       KIRBY_API_KEY: ${KIRBY_API_KEY_PRO}
     volumes:
       - ./logs:/app/logs
+      - ./models/metadata:/app/models/metadata:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,7 +71,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-binance
-    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
+    env_file:
+      - .env
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage
@@ -79,10 +82,11 @@ services:
       EXCHANGE: binance
 
       # Strategy configuration (comma-separated list)
-      STRATEGY_IDS: ${BINANCE_STRATEGY_IDS:-btc_momentum_v1,sol_swing_v1}
+      # Note: Using hardcoded values due to Windows Docker Desktop .env parsing issues
+      STRATEGY_IDS: dev_scalper_1m_v1,sol_scalper_15m_v1,sol_volatility_regime_adaptive_v1
 
       # Starlisting IDs (comma-separated)
-      STARLISTING_IDS: ${BINANCE_STARLISTING_IDS:-1,2}
+      STARLISTING_IDS: "1,6,6"
 
       # Kirby WebSocket (both dev and prod for config compatibility)
       KIRBY_WS_URL: ${KIRBY_WS_URL_PRO}
@@ -129,7 +133,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-hyperliquid
-    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage

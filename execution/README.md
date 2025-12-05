@@ -102,7 +102,7 @@ PAPER_TRADING_SNAPSHOT_INTERVAL=60
 
 ```bash
 # Run integration test
-python scripts/test_websocket_integration.py
+python execution/cli/test_websocket_integration.py
 
 # Expected output:
 # ✓ Connected to Kirby WebSocket
