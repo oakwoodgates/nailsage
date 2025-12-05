@@ -151,11 +151,23 @@ nailsage/
 │   ├── validator.py          # Walk-forward validation
 │   ├── backtest_pipeline.py  # Backtesting workflow
 │   └── targets.py            # Target variable creation
-├── validation/                # Validation framework
-│   ├── time_series_split.py # Walk-forward splitting
-│   ├── backtest.py           # Backtesting engine
-│   ├── metrics.py            # Performance metrics
-│   └── walk_forward.py       # Complete validation pipeline
+├── training/                  # ML training & backtesting
+│   ├── cli/                  # Training command-line tools
+│   │   ├── train_model.py    # Main training entry point
+│   │   ├── run_backtest.py   # Backtesting entry point
+│   │   ├── validate_model.py # Standalone validation
+│   │   └── optimize_hyperparameters.py # Hyperparameter optimization
+│   ├── validation/           # Validation framework
+│   │   ├── time_series_split.py # Walk-forward splitting
+│   │   ├── backtest.py       # Backtesting engine
+│   │   ├── metrics.py        # Performance metrics
+│   │   └── walk_forward.py   # Complete validation pipeline
+│   ├── pipeline.py           # TrainingPipeline orchestrator
+│   ├── data_pipeline.py      # Data loading and preparation
+│   ├── signal_pipeline.py    # Signal generation and filtering
+│   ├── validator.py          # Walk-forward validation
+│   ├── backtest_pipeline.py  # Backtesting workflow
+│   └── targets.py            # Target variable creation
 ├── models/                    # Model registry & metadata
 │   ├── metadata.py           # ModelMetadata (hybrid IDs)
 │   ├── registry.py           # Centralized model storage

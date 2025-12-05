@@ -8,8 +8,8 @@ import pandas as pd
 
 from config.backtest import BacktestConfig
 from config.strategy import StrategyConfig
-from validation.time_series_split import TimeSeriesSplitter
-from validation.backtest import BacktestEngine
+from training.validation.time_series_split import TimeSeriesSplitter
+from training.validation.backtest import BacktestEngine
 from utils.logger import get_training_logger
 
 logger = get_training_logger()

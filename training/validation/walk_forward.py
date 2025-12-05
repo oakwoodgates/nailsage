@@ -7,9 +7,9 @@ import pandas as pd
 import numpy as np
 
 from config.backtest import BacktestConfig
-from validation.time_series_split import TimeSeriesSplitter, TimeSeriesSplit
-from validation.backtest import BacktestEngine
-from validation.metrics import PerformanceMetrics, MetricsCalculator
+from training.validation.time_series_split import TimeSeriesSplitter, TimeSeriesSplit
+from training.validation.backtest import BacktestEngine
+from training.validation.metrics import PerformanceMetrics, MetricsCalculator
 from utils.logger import get_validation_logger
 
 logger = get_validation_logger()

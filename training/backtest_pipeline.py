@@ -13,7 +13,7 @@ from models import ModelRegistry
 from models.feature_schema import FeatureSchema
 from training.data_pipeline import DataPipeline
 from training.signal_pipeline import SignalPipeline
-from validation.backtest import BacktestEngine
+from training.validation.backtest import BacktestEngine
 from utils.logger import get_training_logger
 
 logger = get_training_logger()

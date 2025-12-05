@@ -19,7 +19,7 @@ modules_to_test = [
     ("features.indicators.momentum", ["RSI", "MACD", "ROC"]),
     ("features.indicators.volatility", ["BollingerBands", "ATR"]),
     ("features.indicators.volume", ["VolumeMA"]),
-    ("validation", ["TimeSeriesSplitter", "WalkForwardValidator", "BacktestEngine", "PerformanceMetrics"]),
+    ("training.validation", ["TimeSeriesSplitter", "WalkForwardValidator", "BacktestEngine", "PerformanceMetrics"]),
     ("models", ["ModelMetadata", "ModelRegistry", "create_model_metadata", "generate_model_id", "compare_models", "get_model_lineage"]),
     ("utils.logger", ["setup_logger", "get_logger"]),
 ]

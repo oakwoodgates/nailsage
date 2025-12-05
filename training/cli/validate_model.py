@@ -42,8 +42,8 @@ from features.engine import FeatureEngine
 from models import ModelRegistry
 from models.feature_schema import FeatureSchema
 from training.targets import create_3class_target, create_binary_target
-from validation.backtest import BacktestEngine
-from validation.time_series_split import TimeSeriesSplitter
+from training.validation.backtest import BacktestEngine
+from training.validation.time_series_split import TimeSeriesSplitter
 
 # Setup logging
 logging.basicConfig(

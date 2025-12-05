@@ -13,7 +13,7 @@ import numpy as np
 from datetime import datetime, timedelta
 
 from training.targets import create_binary_target, create_3class_target
-from validation.backtest import BacktestEngine
+from training.validation.backtest import BacktestEngine
 from config.backtest import BacktestConfig
 
 

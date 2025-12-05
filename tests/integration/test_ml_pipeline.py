@@ -20,7 +20,7 @@ import pytest
 from sklearn.ensemble import RandomForestClassifier
 
 from config.backtest import BacktestConfig
-from validation.backtest import BacktestEngine
+from training.validation.backtest import BacktestEngine
 from config.feature import FeatureConfig
 from execution.inference.predictor import ModelPredictor
 from execution.inference.signal_generator import SignalGenerator, SignalGeneratorConfig

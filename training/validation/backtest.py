@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from config.backtest import BacktestConfig
-from validation.metrics import MetricsCalculator, PerformanceMetrics
+from training.validation.metrics import MetricsCalculator, PerformanceMetrics
 from utils.logger import get_backtest_logger
 
 logger = get_backtest_logger()
