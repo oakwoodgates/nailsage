@@ -16,6 +16,7 @@ from api.schemas.arenas import (
     ExchangeListResponse,
     CoinListResponse,
     MarketTypeListResponse,
+    PopularArenaListResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,27 @@ async def list_arenas(
         return ArenaListResponse(arenas=arenas, total=len(arenas))
     except Exception as e:
         logger.error(f"Error listing arenas: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/arenas/popular", response_model=PopularArenaListResponse)
+async def list_popular_arenas(
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of arenas to return"),
+    arena_service: ArenaService = Depends(get_arena_service),
+):
+    """List arenas ranked by number of strategies using them.
+
+    Args:
+        limit: Maximum number of arenas to return (1-100)
+
+    Returns:
+        List of arenas with strategy counts, ordered by popularity
+    """
+    try:
+        arenas = arena_service.get_popular_arenas(limit=limit)
+        return PopularArenaListResponse(arenas=arenas, total=len(arenas))
+    except Exception as e:
+        logger.error(f"Error listing popular arenas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
