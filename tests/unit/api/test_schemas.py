@@ -192,6 +192,43 @@ class TestTradeResponse:
         assert trade.trade_type == "open_long"
         assert trade.size == 1000.0
 
+    def test_trade_with_arena_id(self):
+        """Test trade response with arena_id."""
+        trade = TradeResponse(
+            id=1,
+            position_id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            trade_type="open_long",
+            size=1000.0,
+            price=50000.0,
+            fees=1.0,
+            slippage=0.5,
+            timestamp=1700000000000,
+            arena_id=1,
+            strategy_name="test_strategy",
+            position_side="long",
+        )
+        assert trade.arena_id == 1
+        assert trade.strategy_name == "test_strategy"
+        assert trade.position_side == "long"
+
+    def test_trade_without_arena_id(self):
+        """Test trade response without arena_id (null)."""
+        trade = TradeResponse(
+            id=1,
+            position_id=1,
+            strategy_id=1,
+            starlisting_id=123,
+            trade_type="close_short",
+            size=500.0,
+            price=48000.0,
+            fees=0.5,
+            slippage=0.25,
+            timestamp=1700000000000,
+        )
+        assert trade.arena_id is None
+
 
 class TestPositionResponse:
     """Tests for PositionResponse schema."""

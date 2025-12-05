@@ -15,6 +15,8 @@ from api.schemas.arenas import (
     ExchangeListResponse,
     CoinListResponse,
     MarketTypeListResponse,
+    PopularArenaResponse,
+    PopularArenaListResponse,
 )
 
 
@@ -110,6 +112,28 @@ class TestArenaResponse:
         assert arena.exchange.slug == "hyperliquid"
         assert arena.market_type.type == "perps"
         assert arena.interval_seconds == 900
+        assert arena.strategies == []  # Default empty list
+
+    def test_arena_with_strategies(self):
+        """Test arena response with strategy IDs."""
+        arena = ArenaResponse(
+            id=1,
+            starlisting_id=123,
+            trading_pair="BTC/USD",
+            trading_pair_id=1,
+            coin=CoinResponse(id=1, symbol="BTC", name="Bitcoin"),
+            quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+            exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+            market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+            interval="15m",
+            interval_seconds=900,
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+            strategies=[2, 3, 5],
+        )
+        assert arena.strategies == [2, 3, 5]
+        assert len(arena.strategies) == 3
 
     def test_arena_optional_trading_pair_id(self):
         """Test arena with optional trading_pair_id."""
@@ -268,3 +292,126 @@ class TestLookupListResponses:
         )
         assert len(response.market_types) == 2
         assert response.total == 2
+
+
+class TestPopularArenaResponse:
+    """Tests for PopularArenaResponse schema."""
+
+    def test_valid_popular_arena(self):
+        """Test valid popular arena response with strategy count."""
+        arena = PopularArenaResponse(
+            id=1,
+            starlisting_id=123,
+            trading_pair="BTC/USD",
+            trading_pair_id=1,
+            coin=CoinResponse(id=1, symbol="BTC", name="Bitcoin"),
+            quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+            exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+            market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+            interval="15m",
+            interval_seconds=900,
+            is_active=True,
+            last_synced_at=1700000000000,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+            strategy_count=5,
+            strategies=[1, 2, 3, 4, 5],
+        )
+        assert arena.id == 1
+        assert arena.trading_pair == "BTC/USD"
+        assert arena.strategy_count == 5
+        assert arena.strategies == [1, 2, 3, 4, 5]
+
+    def test_popular_arena_zero_strategies(self):
+        """Test popular arena with zero strategies."""
+        arena = PopularArenaResponse(
+            id=2,
+            starlisting_id=456,
+            trading_pair="SOL/USD",
+            trading_pair_id=2,
+            coin=CoinResponse(id=3, symbol="SOL", name="Solana"),
+            quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+            exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+            market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+            interval="1m",
+            interval_seconds=60,
+            is_active=True,
+            created_at=1700000000000,
+            updated_at=1700000000000,
+            strategy_count=0,
+        )
+        assert arena.strategy_count == 0
+
+    def test_popular_arena_missing_strategy_count(self):
+        """Test popular arena with missing strategy_count."""
+        with pytest.raises(ValidationError):
+            PopularArenaResponse(
+                id=1,
+                starlisting_id=123,
+                trading_pair="BTC/USD",
+                trading_pair_id=1,
+                coin=CoinResponse(id=1, symbol="BTC", name="Bitcoin"),
+                quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+                exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+                market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+                interval="15m",
+                interval_seconds=900,
+                is_active=True,
+                created_at=1700000000000,
+                updated_at=1700000000000,
+                # missing strategy_count
+            )
+
+
+class TestPopularArenaListResponse:
+    """Tests for PopularArenaListResponse schema."""
+
+    def test_valid_popular_arena_list(self):
+        """Test valid popular arena list response."""
+        response = PopularArenaListResponse(
+            arenas=[
+                PopularArenaResponse(
+                    id=1,
+                    starlisting_id=1,
+                    trading_pair="BTC/USD",
+                    trading_pair_id=1,
+                    coin=CoinResponse(id=1, symbol="BTC", name="Bitcoin"),
+                    quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+                    exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+                    market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+                    interval="15m",
+                    interval_seconds=900,
+                    is_active=True,
+                    created_at=1700000000000,
+                    updated_at=1700000000000,
+                    strategy_count=5,
+                ),
+                PopularArenaResponse(
+                    id=2,
+                    starlisting_id=2,
+                    trading_pair="SOL/USD",
+                    trading_pair_id=2,
+                    coin=CoinResponse(id=3, symbol="SOL", name="Solana"),
+                    quote=CoinResponse(id=2, symbol="USD", name="US Dollar"),
+                    exchange=ExchangeResponse(id=1, slug="hyperliquid", name="Hyperliquid"),
+                    market_type=MarketTypeResponse(id=1, type="perps", name="Perpetuals"),
+                    interval="1m",
+                    interval_seconds=60,
+                    is_active=True,
+                    created_at=1700000000000,
+                    updated_at=1700000000000,
+                    strategy_count=2,
+                ),
+            ],
+            total=2,
+        )
+        assert len(response.arenas) == 2
+        assert response.total == 2
+        assert response.arenas[0].strategy_count == 5
+        assert response.arenas[1].strategy_count == 2
+
+    def test_empty_popular_arena_list(self):
+        """Test empty popular arena list response."""
+        response = PopularArenaListResponse(arenas=[], total=0)
+        assert len(response.arenas) == 0
+        assert response.total == 0

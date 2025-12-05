@@ -95,6 +95,17 @@ List all strategies.
 }
 ```
 
+#### GET /api/v1/strategies/by-arena/{arena_id}
+
+Get strategies for a specific arena.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| active_only | boolean | true | Filter to active strategies only |
+
+**Response:** Same structure as `/api/v1/strategies` - list of strategies filtered by arena.
+
 #### GET /api/v1/strategies/{id}
 
 Get strategy by ID.
@@ -289,12 +300,15 @@ List all arenas.
       "is_active": true,
       "last_synced_at": 1700000000000,
       "created_at": 1700000000000,
-      "updated_at": 1700000000000
+      "updated_at": 1700000000000,
+      "strategies": [1, 2]
     }
   ],
   "total": 1
 }
 ```
+
+**Note:** The `strategies` field contains an array of active strategy IDs that are using this arena.
 
 #### GET /api/v1/arenas/{id}
 
@@ -307,6 +321,60 @@ Get arena by ID.
 Get arena by Kirby starlisting ID.
 
 **Response:** Same structure as arena object above.
+
+#### GET /api/v1/arenas/popular
+
+List arenas ranked by number of strategies using them.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| limit | integer | 10 | Max arenas to return (1-100) |
+
+**Response:**
+```json
+{
+  "arenas": [
+    {
+      "id": 1,
+      "starlisting_id": 123,
+      "trading_pair": "BTC/USD",
+      "trading_pair_id": 1,
+      "coin": {
+        "id": 1,
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "quote": {
+        "id": 2,
+        "symbol": "USD",
+        "name": "US Dollar"
+      },
+      "exchange": {
+        "id": 1,
+        "slug": "hyperliquid",
+        "name": "Hyperliquid"
+      },
+      "market_type": {
+        "id": 1,
+        "type": "perps",
+        "name": "Perpetuals"
+      },
+      "interval": "15m",
+      "interval_seconds": 900,
+      "is_active": true,
+      "last_synced_at": 1700000000000,
+      "created_at": 1700000000000,
+      "updated_at": 1700000000000,
+      "strategies": [1, 2, 3, 4, 5],
+      "strategy_count": 5
+    }
+  ],
+  "total": 1
+}
+```
+
+**Note:** In addition to `strategy_count`, this endpoint also returns `strategies` containing the actual IDs of active strategies using this arena.
 
 #### POST /api/v1/arenas/sync
 
@@ -423,7 +491,8 @@ List trades with optional filtering.
       "signal_id": 1,
       "created_at": 1700000000000,
       "strategy_name": "btc_scalper",
-      "position_side": "long"
+      "position_side": "long",
+      "arena_id": 1
     }
   ],
   "total": 1,
