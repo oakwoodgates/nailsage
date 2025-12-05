@@ -151,23 +151,22 @@ nailsage/
 │   ├── validator.py          # Walk-forward validation
 │   ├── backtest_pipeline.py  # Backtesting workflow
 │   └── targets.py            # Target variable creation
-├── training/                  # ML training & backtesting
-│   ├── cli/                  # Training command-line tools
-│   │   ├── train_model.py    # Main training entry point
-│   │   ├── run_backtest.py   # Backtesting entry point
-│   │   ├── validate_model.py # Standalone validation
-│   │   └── optimize_hyperparameters.py # Hyperparameter optimization
-│   ├── validation/           # Validation framework
-│   │   ├── time_series_split.py # Walk-forward splitting
-│   │   ├── backtest.py       # Backtesting engine
-│   │   ├── metrics.py        # Performance metrics
-│   │   └── walk_forward.py   # Complete validation pipeline
-│   ├── pipeline.py           # TrainingPipeline orchestrator
-│   ├── data_pipeline.py      # Data loading and preparation
-│   ├── signal_pipeline.py    # Signal generation and filtering
-│   ├── validator.py          # Walk-forward validation
-│   ├── backtest_pipeline.py  # Backtesting workflow
-│   └── targets.py            # Target variable creation
+├── execution/                 # Paper trading & live execution
+│   ├── cli/                  # Execution command-line tools
+│   │   ├── run_multi_strategy.py # Multi-strategy paper trading
+│   │   ├── check_paper_trading_stats.py # Statistics checker
+│   │   ├── test_websocket_integration.py # WebSocket testing
+│   │   ├── test_signal_save.py # Signal testing
+│   │   └── debug_kirby_messages.py # Kirby debugging
+│   ├── inference/            # Model inference for live trading
+│   ├── persistence/          # Database state management
+│   ├── risk/                 # Risk management
+│   ├── runner/               # Live strategy orchestration
+│   ├── simulator/            # Order execution simulation
+│   ├── streaming/            # Real-time data processing
+│   ├── tracking/             # Position management
+│   ├── websocket/            # Live market data connection
+│   └── state/                # Database files
 ├── models/                    # Model registry & metadata
 │   ├── metadata.py           # ModelMetadata (hybrid IDs)
 │   ├── registry.py           # Centralized model storage
@@ -187,15 +186,10 @@ nailsage/
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
 └── scripts/                   # System administration scripts
-    ├── check_paper_trading_stats.py
-    ├── debug_kirby_messages.py
     ├── generate_data_metadata.py
     ├── migrate_arenas.py
-    ├── run_multi_strategy.py
     ├── test_historical_candles.py
     ├── test_model_registry.py
-    ├── test_signal_save.py
-    ├── test_websocket_integration.py
     └── verify_imports.py
 ```
 

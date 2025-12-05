@@ -1,7 +1,7 @@
 """Test saving a signal to debug SQLite error."""
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from execution.persistence.state_manager import StateManager, Signal, Strategy
 

@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.paper_trading import load_paper_trading_config
 from execution.persistence.state_manager import StateManager, StateSnapshot

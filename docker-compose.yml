@@ -71,7 +71,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-binance
-    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
     env_file:
       - .env
     environment:
@@ -133,7 +133,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nailsage-hyperliquid
-    command: ["bash", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["bash", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
     environment:
       # Database
       DATABASE_URL: postgresql://nailsage:${DB_PASSWORD}@postgres:5432/nailsage

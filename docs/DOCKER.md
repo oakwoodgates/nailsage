@@ -575,7 +575,7 @@ services:
   nailsage-binance:
     build: .
     container_name: nailsage-binance
-    command: ["sh", "/app/docker-entrypoint.sh", "python", "scripts/run_multi_strategy.py"]
+    command: ["sh", "/app/docker-entrypoint.sh", "python", "execution/cli/run_multi_strategy.py"]
     env_file: /opt/nailsage/secrets/.env
     environment:
       EXCHANGE: binance
