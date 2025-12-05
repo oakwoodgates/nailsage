@@ -77,6 +77,11 @@ class Validator:
             slippage_bps=self.config.backtest.slippage_bps,
             enable_leverage=self.config.backtest.leverage > 1,
             max_leverage=float(self.config.backtest.leverage),
+            max_position_size=getattr(self.config.backtest, 'max_position_size', 1.0),
+            funding_rate_annual=getattr(self.config.backtest, 'funding_rate_annual', 0.0),
+            fill_assumption=getattr(self.config.backtest, 'fill_assumption', 'close'),
+            assume_maker=getattr(self.config.backtest, 'assume_maker', False),
+            maker_fee=getattr(self.config.backtest, 'maker_fee', 0.0002),
         )
 
     def run_validation(

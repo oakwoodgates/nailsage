@@ -9,7 +9,7 @@ import numpy as np
 from config.backtest import BacktestConfig
 from training.validation.time_series_split import TimeSeriesSplitter, TimeSeriesSplit
 from training.validation.backtest import BacktestEngine
-from training.validation.metrics import PerformanceMetrics, MetricsCalculator
+from training.validation.metrics import PerformanceMetrics, AccuracyMetrics, MetricsCalculator
 from utils.logger import get_validation_logger
 
 logger = get_validation_logger()
@@ -23,6 +23,8 @@ class WalkForwardResult:
     split_info: TimeSeriesSplit
     train_metrics: Optional[PerformanceMetrics]
     val_metrics: PerformanceMetrics
+    train_accuracy: Optional[AccuracyMetrics]  # Training accuracy metrics
+    val_accuracy: Optional[AccuracyMetrics]    # Validation accuracy metrics
     model: Any  # Trained model object
     feature_importance: Optional[Dict[str, float]] = None
 
@@ -133,6 +135,10 @@ class WalkForwardValidator:
                 logger.error(f"Prediction failed for split {split.split_index}: {e}")
                 raise
 
+            # Calculate accuracy metrics
+            train_accuracy = MetricsCalculator.calculate_accuracy_metrics(y_train, train_preds)
+            val_accuracy = MetricsCalculator.calculate_accuracy_metrics(y_val[val_valid], val_preds)
+
             # Convert predictions to trading signals
             # Assuming predictions are class labels: -1 (short), 0 (neutral), 1 (long)
             # Or probabilities that need to be thresholded
@@ -182,6 +188,8 @@ class WalkForwardValidator:
                 split_info=split,
                 train_metrics=train_metrics,
                 val_metrics=val_metrics,
+                train_accuracy=train_accuracy,
+                val_accuracy=val_accuracy,
                 model=model,
                 feature_importance=feature_importance,
             )
@@ -189,11 +197,13 @@ class WalkForwardValidator:
 
             logger.info(
                 f"Split {split.split_index} complete: "
+                f"Train Acc={train_accuracy.accuracy:.2%}, "
+                f"Val Acc={val_accuracy.accuracy:.2%}, "
                 f"Val Sharpe={val_metrics.sharpe_ratio:.2f}, "
                 f"Val Return={val_metrics.total_return:.2%}"
             )
 
-        logger.info(f"Walk-forward validation complete: {len(self.results)} splits")
+        logger.info(f"Walk-forward validation complete: {len(self.results)}/{len(splits)} splits processed")
         return self.results
 
     def _convert_to_signals(self, predictions: np.ndarray) -> np.ndarray:

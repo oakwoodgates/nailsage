@@ -1,6 +1,92 @@
 """Classification target variable creation."""
 
 import pandas as pd
+from typing import Dict, Any, Callable
+from enum import Enum
+
+
+class TargetType(Enum):
+    """Supported target types."""
+    BINARY = "binary"
+    THREE_CLASS = "3class"
+    REGRESSION = "regression"
+
+
+class TargetFactory:
+    """
+    Factory for creating target variables of different types.
+
+    Supports binary classification, 3-class classification, and regression targets.
+    """
+
+    @staticmethod
+    def create_target(
+        target_type: str,
+        df: pd.DataFrame,
+        lookahead_bars: int,
+        **kwargs
+    ) -> pd.Series:
+        """
+        Create target variable based on type.
+
+        Args:
+            target_type: Type of target ('binary', '3class', 'regression')
+            df: DataFrame with OHLCV data
+            lookahead_bars: How many bars ahead to look
+            **kwargs: Additional parameters for target creation
+
+        Returns:
+            Target series
+
+        Raises:
+            ValueError: If target_type is not supported
+        """
+        target_type_enum = TargetType(target_type.lower())
+
+        if target_type_enum == TargetType.BINARY:
+            threshold_pct = kwargs.get('threshold_pct', 0.0)
+            return create_binary_target(df, lookahead_bars, threshold_pct)
+
+        elif target_type_enum == TargetType.THREE_CLASS:
+            threshold_pct = kwargs.get('threshold_pct', 0.5)
+            return create_3class_target(df, lookahead_bars, threshold_pct)
+
+        elif target_type_enum == TargetType.REGRESSION:
+            # For regression, we predict the actual return percentage
+            future_returns = df['close'].pct_change(periods=lookahead_bars).shift(-lookahead_bars)
+            return future_returns
+
+        else:
+            raise ValueError(f"Unsupported target type: {target_type}")
+
+    @staticmethod
+    def get_supported_types() -> list[str]:
+        """Get list of supported target types."""
+        return [t.value for t in TargetType]
+
+    @staticmethod
+    def validate_target_config(target_type: str, **kwargs) -> None:
+        """
+        Validate target configuration.
+
+        Args:
+            target_type: Type of target
+            **kwargs: Configuration parameters
+
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        try:
+            TargetType(target_type.lower())
+        except ValueError:
+            raise ValueError(f"Unsupported target type: {target_type}")
+
+        if target_type.lower() in [TargetType.BINARY.value, TargetType.THREE_CLASS.value]:
+            if 'threshold_pct' in kwargs and kwargs['threshold_pct'] < 0:
+                raise ValueError("threshold_pct must be non-negative")
+
+        if 'lookahead_bars' in kwargs and kwargs['lookahead_bars'] <= 0:
+            raise ValueError("lookahead_bars must be positive")
 
 
 def create_binary_target(

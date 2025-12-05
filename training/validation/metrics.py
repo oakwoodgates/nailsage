@@ -105,6 +105,56 @@ class PerformanceMetrics:
         return summary
 
 
+@dataclass
+class AccuracyMetrics:
+    """
+    Container for ML model accuracy metrics.
+
+    Includes precision, recall, F1-score, and confusion matrix statistics.
+    """
+
+    # Overall accuracy
+    accuracy: float
+
+    # Binary classification metrics (if applicable)
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    f1_score: Optional[float] = None
+
+    # Multi-class metrics
+    macro_precision: Optional[float] = None
+    macro_recall: Optional[float] = None
+    macro_f1: Optional[float] = None
+
+    # Confusion matrix
+    confusion_matrix: Optional[np.ndarray] = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        result = {
+            "accuracy": self.accuracy,
+        }
+
+        if self.precision is not None:
+            result["precision"] = self.precision
+        if self.recall is not None:
+            result["recall"] = self.recall
+        if self.f1_score is not None:
+            result["f1_score"] = self.f1_score
+
+        if self.macro_precision is not None:
+            result["macro_precision"] = self.macro_precision
+        if self.macro_recall is not None:
+            result["macro_recall"] = self.macro_recall
+        if self.macro_f1 is not None:
+            result["macro_f1"] = self.macro_f1
+
+        if self.confusion_matrix is not None:
+            result["confusion_matrix"] = self.confusion_matrix.tolist()
+
+        return result
+
+
 class MetricsCalculator:
     """
     Calculate trading performance metrics from returns or equity curve.
@@ -273,3 +323,56 @@ class MetricsCalculator:
             "winning_trades": n_winning,
             "losing_trades": n_losing,
         }
+
+    @staticmethod
+    def calculate_accuracy_metrics(
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+    ) -> AccuracyMetrics:
+        """
+        Calculate ML model accuracy metrics.
+
+        Args:
+            y_true: True labels
+            y_pred: Predicted labels
+
+        Returns:
+            AccuracyMetrics object
+        """
+        from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
+
+        # Overall accuracy
+        accuracy = accuracy_score(y_true, y_pred)
+
+        # Get unique classes to determine if binary or multi-class
+        unique_classes = np.unique(np.concatenate([y_true, y_pred]))
+        n_classes = len(unique_classes)
+
+        # Binary classification metrics
+        if n_classes == 2:
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true, y_pred, average='binary', zero_division=0
+            )
+            macro_precision, macro_recall, macro_f1, _ = precision_recall_fscore_support(
+                y_true, y_pred, average='macro', zero_division=0
+            )
+        else:
+            # Multi-class: use macro averaging
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true, y_pred, average='macro', zero_division=0
+            )
+            macro_precision = macro_recall = macro_f1 = None
+
+        # Confusion matrix
+        cm = confusion_matrix(y_true, y_pred)
+
+        return AccuracyMetrics(
+            accuracy=accuracy,
+            precision=precision if n_classes == 2 else None,
+            recall=recall if n_classes == 2 else None,
+            f1_score=f1 if n_classes == 2 else None,
+            macro_precision=macro_precision,
+            macro_recall=macro_recall,
+            macro_f1=macro_f1,
+            confusion_matrix=cm,
+        )

@@ -18,6 +18,7 @@ from training.data_pipeline import DataPipeline
 from training.signal_pipeline import SignalPipeline
 from training.validator import Validator
 from utils.logger import get_training_logger
+from utils.determinism import set_random_seeds, validate_config_consistency
 
 logger = get_training_logger()
 
@@ -55,13 +56,21 @@ class TrainingPipeline:
         Args:
             config: Strategy configuration
         """
+        # Set random seeds for reproducible results
+        random_seed = getattr(config, 'random_seed', 42)
+        set_random_seeds(random_seed)
+
+        # Validate configuration consistency
+        validate_config_consistency(config)
+
         self.config = config
         self.data_pipeline = DataPipeline(config)
         self.signal_pipeline = SignalPipeline(config)
         self.validator = Validator(config)
 
         logger.info(
-            f"Initialized TrainingPipeline for {config.strategy_name} v{config.version}"
+            f"Initialized TrainingPipeline for {config.strategy_name} v{config.version} "
+            f"(seed={random_seed})"
         )
 
     def run(

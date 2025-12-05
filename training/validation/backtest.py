@@ -98,7 +98,7 @@ class BacktestEngine:
         # Simulate trading
         for i in range(len(df)):
             current_signal = signals.iloc[i]
-            current_price = self._get_execution_price(df.iloc[i], price_column)
+            current_price = self._get_mark_to_market_price(df.iloc[i], price_column)
             current_time = df.index[i]
 
             # Check for position exit
@@ -160,7 +160,7 @@ class BacktestEngine:
 
         # Close any open position at end
         if position != 0:
-            exit_price = self._get_execution_price(df.iloc[-1], price_column)
+            exit_price = self._get_execution_price(df.iloc[-1], price_column, apply_slippage=True)
             pnl, fees, slippage = self._calculate_pnl(
                 entry_price=entry_price,
                 exit_price=exit_price,
@@ -218,13 +218,14 @@ class BacktestEngine:
 
         return metrics
 
-    def _get_execution_price(self, bar: pd.Series, price_column: str) -> float:
+    def _get_execution_price(self, bar: pd.Series, price_column: str, apply_slippage: bool = True) -> float:
         """
         Get execution price for a bar based on fill assumption.
 
         Args:
             bar: OHLCV bar
             price_column: Column to use
+            apply_slippage: Whether to apply slippage (only for actual executions)
 
         Returns:
             Execution price
@@ -238,11 +239,25 @@ class BacktestEngine:
         else:
             price = bar[price_column]
 
-        # Apply slippage
-        slippage_pct = self.config.slippage_bps / 10000.0
-        price = price * (1 + slippage_pct)
+        # Only apply slippage for actual trade executions, not mark-to-market
+        if apply_slippage:
+            slippage_pct = self.config.slippage_bps / 10000.0
+            price = price * (1 + slippage_pct)
 
         return price
+
+    def _get_mark_to_market_price(self, bar: pd.Series, price_column: str) -> float:
+        """
+        Get mark-to-market price (no slippage applied).
+
+        Args:
+            bar: OHLCV bar
+            price_column: Column to use
+
+        Returns:
+            Mark-to-market price without slippage
+        """
+        return self._get_execution_price(bar, price_column, apply_slippage=False)
 
     def _calculate_position_size(
         self, capital: float, price: float, confidence: float = None
