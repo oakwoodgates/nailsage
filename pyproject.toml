@@ -107,7 +107,7 @@ all = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["config*", "data*", "features*", "strategies*", "validation*", "models*", "execution*", "utils*"]
-exclude = ["tests*", "experiments*", "scripts*"]
+exclude = ["tests*", "scripts*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -143,7 +143,6 @@ markers = [
 source = ["."]
 omit = [
     "*/tests/*",
-    "*/experiments/*",
     "*/__init__.py",
     "data/*",
     "logs/*",

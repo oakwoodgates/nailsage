@@ -220,12 +220,6 @@ models/metadata/*
 !models/trained/.gitkeep
 !models/metadata/.gitkeep
 
-# Experiment results
-experiments/*.html
-experiments/*.png
-experiments/*.pkl
-experiments/*.joblib
-experiments/results/
 
 # Walk-forward validation results (can be regenerated)
 results/

@@ -72,9 +72,8 @@ execution/state/*.db
 logs/
 *.log
 
-# Results and experiments (not needed in container)
+# Results (not needed in container)
 results/
-experiments/
 
 # Documentation (not needed in production image)
 docs/

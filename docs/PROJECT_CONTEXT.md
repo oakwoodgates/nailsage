@@ -131,7 +131,6 @@ nailsage/                      # Project root
 │   ├── logger.py             # Structured logging
 │   └── config.py             # Config loading helpers
 ├── tests/                     # Test suite
-├── experiments/               # Jupyter notebooks
 └── scripts/                   # Helper scripts
     ├── generate_data_metadata.py  # CLI for metadata generation
     └── test_model_registry.py     # Model registry demonstration
