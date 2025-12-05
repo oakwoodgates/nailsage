@@ -6,9 +6,9 @@ Complete guide for training, validating, and backtesting ML trading models in Na
 
 NailSage provides three generic scripts that work with any strategy configuration:
 
-1. **`scripts/train_model.py`** - Train models with optional walk-forward validation
-2. **`scripts/validate_model.py`** - Standalone validation of existing models
-3. **`scripts/run_backtest.py`** - Quick single-period backtests
+1. **`training/cli/train_model.py`** - Train models with optional walk-forward validation
+2. **`training/cli/validate_model.py`** - Standalone validation of existing models
+3. **`training/cli/run_backtest.py`** - Quick single-period backtests
 
 All scripts are **configuration-driven** - strategy differences are captured in YAML config files, not code.
 
@@ -16,15 +16,15 @@ All scripts are **configuration-driven** - strategy differences are captured in 
 
 ```bash
 # Train with walk-forward validation (saves results to JSON)
-python scripts/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
+python training/cli/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
 
 # Validate existing model
-python scripts/validate_model.py \
+python training/cli/validate_model.py \
     --config configs/strategies/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 
 # Quick backtest
-python scripts/run_backtest.py \
+python training/cli/run_backtest.py \
     --config configs/strategies/dev_scalper_1m_v1.yaml \
     --model-id 33b9a1937aacaa4d_20251126_152519_f8835d
 ```

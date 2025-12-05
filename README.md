@@ -61,13 +61,13 @@ python scripts/generate_data_metadata.py --dir data/raw
 
 ```bash
 # Train with walk-forward validation (saves results to JSON)
-python scripts/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
+python training/cli/train_model.py --config configs/strategies/dev_scalper_1m_v1.yaml
 
 # Validate existing model
-python scripts/validate_model.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/validate_model.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 
 # Quick backtest
-python scripts/run_backtest.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
+python training/cli/run_backtest.py --config configs/strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
 ```
 
 ### Run Tests
@@ -139,6 +139,17 @@ nailsage/
 │   ├── engine.py             # Dynamic feature computation
 │   ├── indicators/           # 8 technical indicators
 │   └── cache/                # Feature cache storage
+├── training/                  # ML training & backtesting
+│   ├── cli/                  # Training command-line tools
+│   │   ├── train_model.py    # Main training entry point
+│   │   ├── run_backtest.py   # Backtesting entry point
+│   │   ├── validate_model.py # Standalone validation
+│   │   └── optimize_hyperparameters.py # Hyperparameter optimization
+│   ├── pipeline.py           # TrainingPipeline orchestrator
+│   ├── data_pipeline.py      # Data loading and preparation
+│   ├── signal_pipeline.py    # Signal generation and filtering
+│   ├── validator.py          # Walk-forward validation
+│   └── backtest_pipeline.py  # Backtesting workflow
 ├── validation/                # Validation framework
 │   ├── time_series_split.py # Walk-forward splitting
 │   ├── backtest.py           # Backtesting engine
@@ -150,9 +161,8 @@ nailsage/
 │   ├── utils.py              # Model utilities
 │   ├── trained/              # Serialized models
 │   └── metadata/             # Model metadata (JSON)
-├── strategies/                # Strategy implementations
-│   ├── short_term/           # Short-term strategies
-│   └── long_term/            # Long-term strategies
+├── targets/                   # Target variable creation
+│   └── classification.py     # Binary and multiclass targets
 ├── api/                       # FastAPI REST/WebSocket API
 │   ├── routers/              # Endpoint routers
 │   │   ├── strategies.py     # Strategy management
@@ -165,12 +175,16 @@ nailsage/
 ├── tests/                     # Test suite
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
-└── scripts/                   # Training & utility scripts
-    ├── train_model.py        # Generic training with walk-forward validation
-    ├── validate_model.py     # Standalone model validation
-    ├── run_backtest.py       # Quick backtesting
+└── scripts/                   # System administration scripts
+    ├── check_paper_trading_stats.py
+    ├── debug_kirby_messages.py
     ├── generate_data_metadata.py
+    ├── migrate_arenas.py
+    ├── run_multi_strategy.py
+    ├── test_historical_candles.py
     ├── test_model_registry.py
+    ├── test_signal_save.py
+    ├── test_websocket_integration.py
     └── verify_imports.py
 ```
 

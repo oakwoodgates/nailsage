@@ -14,9 +14,9 @@ This document tracks which files are currently in use, which have been deprecate
 | File | Purpose | Used By | Status |
 |------|---------|---------|--------|
 | [scripts/run_multi_strategy.py](../scripts/run_multi_strategy.py) | **PRIMARY ENTRY POINT** - Multi-strategy paper trading for Docker | Docker containers | ✅ **ACTIVE** |
-| [scripts/train_model.py](../scripts/train_model.py) | Generic model training with walk-forward validation | Manual training | ✅ **ACTIVE** |
-| [scripts/validate_model.py](../scripts/validate_model.py) | Standalone model validation | Manual validation | ✅ **ACTIVE** |
-| [scripts/run_backtest.py](../scripts/run_backtest.py) | Quick backtesting | Manual backtesting | ✅ **ACTIVE** |
+| [training/cli/train_model.py](../training/cli/train_model.py) | Generic model training with walk-forward validation | Manual training | ✅ **ACTIVE** |
+| [training/cli/validate_model.py](../training/cli/validate_model.py) | Standalone model validation | Manual validation | ✅ **ACTIVE** |
+| [training/cli/run_backtest.py](../training/cli/run_backtest.py) | Quick backtesting | Manual backtesting | ✅ **ACTIVE** |
 
 ### Core Execution Modules (Active)
 
@@ -102,9 +102,9 @@ All models use the **same training infrastructure** with strategy-specific YAML 
 
 | Script | Purpose |
 |--------|---------|
-| [scripts/train_model.py](../scripts/train_model.py) | Generic training + walk-forward validation |
-| [scripts/validate_model.py](../scripts/validate_model.py) | Standalone validation |
-| [scripts/run_backtest.py](../scripts/run_backtest.py) | Quick backtesting |
+| [training/cli/train_model.py](../training/cli/train_model.py) | Generic training + walk-forward validation |
+| [training/cli/validate_model.py](../training/cli/validate_model.py) | Standalone validation |
+| [training/cli/run_backtest.py](../training/cli/run_backtest.py) | Quick backtesting |
 
 **Configuration**: `configs/strategies/*.yaml`
 
@@ -168,7 +168,7 @@ nailsage/
 ### "I need to add a new strategy" → What do I do?
 
 1. Create YAML config in `configs/strategies/my_strategy_v1.yaml`
-2. Train: `python scripts/train_model.py --config configs/strategies/my_strategy_v1.yaml`
+2. Train: `python training/cli/train_model.py --config configs/strategies/my_strategy_v1.yaml`
 3. Deploy: Update `docker-compose.yml` environment variables
 4. See [MODEL_TRAINING.md](MODEL_TRAINING.md) for details
 
