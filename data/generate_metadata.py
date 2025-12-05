@@ -8,8 +8,8 @@ validates it, and generates corresponding metadata files.
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
 
 import pandas as pd
 from config.data import DataConfig

@@ -246,7 +246,7 @@
 
 **Implementation**:
 - `data/metadata.py`: DatasetMetadata dataclass
-- `scripts/generate_data_metadata.py`: CLI tool for metadata generation
+- `data/generate_metadata.py`: CLI tool for metadata generation
 - `data/loader.py`: Enhanced with column name normalization
 
 ---

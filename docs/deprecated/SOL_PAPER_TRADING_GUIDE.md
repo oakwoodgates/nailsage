@@ -260,4 +260,4 @@ If you encounter issues:
 1. Check logs: `tail -f execution/logs/paper_trading.log`
 2. Review database: `sqlite3 execution/state/paper_trading.db`
 3. Test WebSocket: `python scripts/test_websocket_connection.py`
-4. Validate model: `python scripts/test_model_registry.py`
+4. Validate model: `python tests/integration/test_model_registry_demo.py`

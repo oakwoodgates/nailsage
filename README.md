@@ -135,6 +135,7 @@ nailsage/
 │   ├── loader.py             # Load OHLCV data (Parquet/CSV)
 │   ├── validator.py          # Data quality validation
 │   ├── metadata.py           # Dataset provenance tracking
+│   ├── generate_metadata.py  # Metadata generation utility
 │   └── raw/                  # Raw OHLCV data storage
 ├── features/                  # Feature engineering
 │   ├── engine.py             # Dynamic feature computation
@@ -190,11 +191,9 @@ nailsage/
 ├── tests/                     # Test suite
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
-└── scripts/                   # System administration scripts
-    ├── generate_data_metadata.py
-    ├── migrate_arenas.py
-    ├── test_historical_candles.py
-    ├── test_model_registry.py
+│       ├── test_kirby_websocket.py # WebSocket integration
+│       └── test_model_registry_demo.py # Model registry demo
+└── scripts/                   # Development utilities
     └── verify_imports.py
 ```
 

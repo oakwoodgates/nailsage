@@ -16,7 +16,7 @@ Complete guide for implementing your first ML trading strategy in NailSage (LEGA
 
 Before implementing a strategy, ensure you have:
 
-1. ✅ **Data with metadata**: Run `python scripts/generate_data_metadata.py --dir data/raw`
+1. ✅ **Data with metadata**: Run `python data/generate_metadata.py --dir data/raw`
 2. ✅ **Dependencies installed**: `pip install xgboost lightgbm scikit-learn pandas numpy`
 3. ✅ **Tests passing**: `pytest tests/unit/ -v` shows 21/21 passing
 4. ✅ **Imports verified**: `python scripts/verify_imports.py` shows all PASS
