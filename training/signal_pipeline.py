@@ -172,6 +172,10 @@ class SignalPipeline:
         Returns:
             Final trading signals for backtesting
         """
+        target_type = getattr(self.config.target, "type", "").lower()
+        if target_type == "regression":
+            raise ValueError("Regression targets are not supported for signal generation.")
+
         # Convert predictions to signals
         signals = self.convert_predictions_to_signals(
             predictions, probabilities, num_classes

@@ -54,8 +54,11 @@ python scripts/generate_data_metadata.py --dir data/raw
 ### Train and Validate Models
 
 ```bash
-# Train with walk-forward validation (saves results to JSON)
-python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml
+# Unified train + validate (walk-forward, per-split retrain, saves JSON)
+python training/cli/run_train_validate.py --config strategies/dev_scalper_1m_v1.yaml
+
+# Train only
+python training/cli/run_train_validate.py --config strategies/dev_scalper_1m_v1.yaml --train-only
 
 # Validate existing model
 python training/cli/validate_model.py --config strategies/dev_scalper_1m_v1.yaml --model-id MODEL_ID
@@ -67,7 +70,7 @@ python training/cli/run_backtest.py --config strategies/dev_scalper_1m_v1.yaml -
 ### Run Tests
 
 ```bash
-# Run all tests
+# Run unit tests (no external env required)
 pytest tests/unit/ -v
 
 # Run with coverage
@@ -134,18 +137,18 @@ nailsage/
 ├── features/                  # Feature engineering
 │   ├── engine.py             # Dynamic feature computation
 │   ├── indicators/           # 8 technical indicators
-│   └── cache/                # Feature cache storage
+│   └── cache/                # Feature cache storage (optional)
 ├── training/                  # ML training & backtesting
 │   ├── cli/                  # Training command-line tools
 │   │   ├── train_model.py    # Main training entry point
 │   │   ├── run_backtest.py   # Backtesting entry point
 │   │   ├── validate_model.py # Standalone validation
 │   │   └── optimize_hyperparameters.py # Hyperparameter optimization
-│   ├── pipeline.py           # TrainingPipeline orchestrator
-│   ├── data_pipeline.py      # Data loading and preparation
-│   ├── signal_pipeline.py    # Signal generation and filtering
-│   ├── validator.py          # Walk-forward validation
-│   ├── backtest_pipeline.py  # Backtesting workflow
+│   ├── pipeline.py           # TrainingPipeline orchestrator (timing, seeding)
+│   ├── data_pipeline.py      # Data loading and preparation (schema checks, cache)
+│   ├── signal_pipeline.py    # Signal generation and filtering (guards regression)
+│   ├── validator.py          # Walk-forward validation (per-split retrain)
+│   ├── backtest_pipeline.py  # Backtesting workflow (risk/exec parity)
 │   └── targets.py            # Target variable creation
 ├── execution/                 # Paper trading & live execution
 │   ├── cli/                  # Execution command-line tools

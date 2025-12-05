@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
+import time
 
 import joblib
 import numpy as np
@@ -89,9 +90,11 @@ class TrainingPipeline:
             TrainingResult with model details and metrics
         """
         logger.info("Starting training pipeline...")
+        t0 = time.perf_counter()
 
         # Step 1: Load and prepare data
         df_clean, target_clean = self.data_pipeline.load_and_prepare_data()
+        t_load = time.perf_counter()
 
         # Step 2: Filter training period
         train_mask = (
@@ -110,12 +113,14 @@ class TrainingPipeline:
         feature_cols = self.data_pipeline.get_feature_columns(df_train)
         X_train = df_train[feature_cols]
         y_train = target_train
+        t_features = time.perf_counter()
 
         # Step 4: Calculate sample weights if specified
         sample_weights = self._calculate_sample_weights(y_train)
 
         # Step 5: Train model
         model = self._create_and_train_model(X_train, y_train, sample_weights)
+        t_train = time.perf_counter()
 
         # Step 6: Evaluate on training set
         train_accuracy = self._evaluate_model(model, X_train, y_train)
@@ -126,6 +131,7 @@ class TrainingPipeline:
             validation_results = self.validator.run_validation(
                 model, df_clean, target_clean, feature_cols
             )
+        t_validation = time.perf_counter()
 
         # Step 8: Create feature schema
         feature_schema = FeatureSchema(
@@ -165,6 +171,14 @@ class TrainingPipeline:
 
         logger.info("Training pipeline completed successfully")
         logger.info(f"Model ID: {result.model_id}")
+        t_end = time.perf_counter()
+        logger.info(
+            "Timing (seconds): "
+            f"load={t_load - t0:.2f}, features={t_features - t_load:.2f}, "
+            f"train={t_train - t_features:.2f}, "
+            f"validation={(t_validation - t_train):.2f if not train_only else 0.0:.2f}, "
+            f"total={t_end - t0:.2f}"
+        )
 
         return result
 

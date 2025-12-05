@@ -4,19 +4,20 @@ Complete guide for training, validating, and backtesting ML trading models in Na
 
 ## 🎯 Overview
 
-NailSage provides three generic scripts that work with any strategy configuration:
+NailSage provides four generic scripts that work with any strategy configuration:
 
-1. **`training/cli/train_model.py`** - Train models with optional walk-forward validation
-2. **`training/cli/validate_model.py`** - Standalone validation of existing models
-3. **`training/cli/run_backtest.py`** - Quick single-period backtests
+1. **`training/cli/run_train_validate.py`** - Unified train + walk-forward validate (per-split retrain)
+2. **`training/cli/train_model.py`** - Train models with optional walk-forward validation
+3. **`training/cli/validate_model.py`** - Standalone validation of existing models
+4. **`training/cli/run_backtest.py`** - Quick single-period backtests
 
 All scripts are **configuration-driven** - strategy differences are captured in YAML config files, not code.
 
 ## 📋 Quick Start
 
 ```bash
-# Train with walk-forward validation (saves results to JSON)
-python training/cli/train_model.py --config strategies/dev_scalper_1m_v1.yaml
+# Unified train + validate (per-split retrain, saves results to JSON)
+python training/cli/run_train_validate.py --config strategies/dev_scalper_1m_v1.yaml
 
 # Validate existing model
 python training/cli/validate_model.py \
@@ -31,7 +32,34 @@ python training/cli/run_backtest.py \
 
 ## 🏗️ Script Details
 
-### 1. Train Model (`scripts/train_model.py`)
+### 1. Unified Train + Validate (`training/cli/run_train_validate.py`)
+
+**Purpose**: Single entrypoint to train and (optionally) validate with walk-forward splits that retrain per split.
+
+**Features**:
+- Per-split retrain for true walk-forward evaluation
+- Deterministic seeding logged per run
+- Schema validation for data/features/targets
+- Optional feature caching keyed by config+data
+- Timing logs for load/feature/train/validation steps
+- JSON results output (default on)
+
+**Usage**:
+
+```bash
+# Train + validate
+python training/cli/run_train_validate.py --config strategies/your_strategy.yaml
+
+# Train only
+python training/cli/run_train_validate.py --config strategies/your_strategy.yaml --train-only
+
+# Skip saving JSON
+python training/cli/run_train_validate.py --config strategies/your_strategy.yaml --no-save
+```
+
+---
+
+### 2. Train Model (`training/cli/train_model.py`)
 
 **Purpose**: Train models with optional walk-forward validation
 
@@ -93,7 +121,7 @@ Results saved to: results/training/dev_scalper_1m_v1_20251126_152519.json
 
 ---
 
-### 2. Validate Model (`scripts/validate_model.py`)
+### 3. Validate Model (`scripts/validate_model.py`)
 
 **Purpose**: Run comprehensive walk-forward validation on existing trained models
 
@@ -160,7 +188,7 @@ Results saved to: results/validation/dev_scalper_1m_v1_20251126_174211.json
 
 ---
 
-### 3. Run Backtest (`scripts/run_backtest.py`)
+### 4. Run Backtest (`scripts/run_backtest.py`)
 
 **Purpose**: Quick single-period backtests on validation data
 
@@ -185,6 +213,34 @@ python scripts/run_backtest.py \
     --model-id MODEL_ID \
     --no-json
 ```
+
+## ⚙️ Configuration Notes
+
+- **Targets**: Supports binary (0/1) and 3-class (0/1/2). Regression targets are explicitly blocked in training/backtest pipelines until implemented.
+- **Backtest settings**: Strategy backtest configs propagate leverage, fees, slippage, maker/taker assumptions, fill assumptions, max position sizing, and funding.
+- **Determinism**: Seeds are set at pipeline start; seeds and per-step timings are logged.
+- **Feature cache (optional)**: Enable `feature_cache_enabled` in strategy config to persist computed features keyed by config+data hash.
+- **Schema validation**: Data pipeline validates required OHLCV columns; feature frames must include `timestamp` and no duplicate columns.
+
+### 🧠 Feature Cache (optional)
+
+Purpose: speed up iterative runs by reusing computed features when the data source and feature config are unchanged.
+
+How it works:
+- Set `feature_cache_enabled: true` in your strategy YAML.
+- Features are cached under `data/processed/cache/{hash}.parquet`.
+- The cache key includes `data_source`, `resample_interval`, feature config, and row count.
+
+When to use:
+- Iterating quickly on models/targets without changing raw data or features.
+- Re-running validation/backtests on the same dataset with different seeds.
+
+When not to use:
+- When raw data or feature config changes frequently (cache misses will occur).
+- When disk space is constrained.
+
+Maintenance:
+- Delete stale caches from `data/processed/cache/` if storage grows too large.
 
 **What It Does**:
 

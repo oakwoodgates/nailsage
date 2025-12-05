@@ -105,6 +105,27 @@ class TestSignalPipeline:
         assert abs(stats["short_percentage"] - 0.28571) < 0.01
         assert abs(stats["neutral_percentage"] - 0.28571) < 0.01
 
+    def test_regression_target_rejected(self):
+        """Regression targets should raise when generating signals."""
+        class RegressionConfig:
+            def __init__(self):
+                self.target = type('Target', (), {
+                    'confidence_threshold': 0.0,
+                    'classes': None,
+                    'type': 'regression'
+                })()
+                self.backtest = type('Backtest', (), {
+                    'min_bars_between_trades': 0
+                })()
+
+        pipeline = SignalPipeline(RegressionConfig())
+        with pytest.raises(ValueError):
+            pipeline.process_signals_for_backtest(
+                predictions=np.array([0.1, -0.2]),
+                probabilities=None,
+                num_classes=3
+            )
+
     def _create_minimal_config(self, confidence_threshold=0.0):
         """Create a minimal StrategyConfig for testing."""
         class MinimalConfig:

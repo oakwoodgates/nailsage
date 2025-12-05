@@ -1,8 +1,10 @@
 """Data pipeline for loading, preparing, and feature engineering."""
 
+import hashlib
+import json
 import logging
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import pandas as pd
 
@@ -40,6 +42,8 @@ class DataPipeline:
         """
         self.config = config
         self.ohlcv_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'num_trades']
+        self.cache_enabled = getattr(config, "feature_cache_enabled", False)
+        self.cache_dir = Path("data/processed/cache")
 
         logger.info("Initialized DataPipeline")
 
@@ -52,6 +56,7 @@ class DataPipeline:
         """
         # Load raw data
         df = self._load_raw_data()
+        self._validate_raw_schema(df)
 
         # Create target variable
         target_series = self._create_target_variable(df)
@@ -59,6 +64,7 @@ class DataPipeline:
         # Initialize and compute features
         feature_engine = FeatureEngine(self.config.features)
         df_features = self._compute_features(df, feature_engine)
+        self._validate_feature_schema(df_features)
 
         # Align features and targets
         df_clean, target_clean = self._align_features_and_targets(
@@ -115,6 +121,19 @@ class DataPipeline:
 
         return resampled
 
+    def _validate_raw_schema(self, df: pd.DataFrame) -> None:
+        """Validate that required OHLCV columns exist."""
+        missing = [c for c in self.ohlcv_columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required OHLCV columns: {missing}")
+
+    def _validate_feature_schema(self, df_features: pd.DataFrame) -> None:
+        """Ensure timestamp is present and no duplicate columns."""
+        if "timestamp" not in df_features.columns:
+            raise ValueError("Feature DataFrame must contain 'timestamp' column.")
+        if df_features.columns.duplicated().any():
+            raise ValueError("Feature DataFrame contains duplicate column names.")
+
     def _create_target_variable(self, df: pd.DataFrame) -> pd.Series:
         """Create target variable based on configured target type."""
         target_type = getattr(self.config.target, "type", None)
@@ -152,9 +171,45 @@ class DataPipeline:
         logger.info("Initializing feature engine...")
         logger.info("Computing features...")
 
+        # Optional caching to speed up iterative runs
+        cache_key = self._build_cache_key(df) if self.cache_enabled else None
+        if cache_key:
+            cached = self._maybe_load_cache(cache_key)
+            if cached is not None:
+                logger.info(f"Loaded features from cache: {cache_key}")
+                return cached
+
         df_features = feature_engine.compute_features(df)
 
+        if cache_key:
+            self._write_cache(cache_key, df_features)
+
         return df_features
+
+    def _build_cache_key(self, df: pd.DataFrame) -> str:
+        """Build a deterministic cache key from data source and feature config."""
+        payload = {
+            "data_source": self.config.data_source,
+            "resample_interval": self.config.resample_interval,
+            "feature_config": getattr(self.config.features, "model_dump", lambda: self.config.features)(),
+            "row_count": len(df),
+        }
+        serialized = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def _maybe_load_cache(self, cache_key: str) -> Optional[pd.DataFrame]:
+        """Load cached features if available."""
+        cache_path = self.cache_dir / f"{cache_key}.parquet"
+        if cache_path.exists():
+            return pd.read_parquet(cache_path)
+        return None
+
+    def _write_cache(self, cache_key: str, df_features: pd.DataFrame) -> None:
+        """Persist features cache to disk."""
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = self.cache_dir / f"{cache_key}.parquet"
+        df_features.to_parquet(cache_path)
+        logger.info(f"Wrote feature cache: {cache_path}")
 
     def _align_features_and_targets(
         self,
