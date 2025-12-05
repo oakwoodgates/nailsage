@@ -1,7 +1,7 @@
 """Arena service for business logic and Kirby API integration."""
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 from sqlalchemy import text
@@ -14,6 +14,7 @@ from api.schemas.arenas import (
     ExchangeResponse,
     CoinResponse,
     MarketTypeResponse,
+    PopularArenaResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,16 @@ class ArenaService:
 
         with engine.connect() as conn:
             result = conn.execute(text(query), params)
-            return [self._row_to_arena_response(row) for row in result.mappings()]
+            rows = list(result.mappings())
+
+            # Batch fetch strategy IDs for all arenas
+            arena_ids = [row["id"] for row in rows]
+            strategy_map = self._get_strategy_ids_for_arenas(arena_ids, conn)
+
+            return [
+                self._row_to_arena_response(row, strategy_map.get(row["id"], []))
+                for row in rows
+            ]
 
     def get_arena_by_id(self, arena_id: int) -> Optional[ArenaResponse]:
         """Get arena by ID with JOINs to lookup tables.
@@ -172,7 +182,12 @@ class ArenaService:
             result = conn.execute(text(query), {"arena_id": arena_id})
             row = result.mappings().fetchone()
 
-        return self._row_to_arena_response(row) if row else None
+            if not row:
+                return None
+
+            # Fetch strategy IDs for this arena
+            strategy_map = self._get_strategy_ids_for_arenas([arena_id], conn)
+            return self._row_to_arena_response(row, strategy_map.get(arena_id, []))
 
     def get_arena_by_starlisting(self, starlisting_id: int) -> Optional[ArenaResponse]:
         """Get arena by Kirby starlisting ID.
@@ -204,7 +219,13 @@ class ArenaService:
             result = conn.execute(text(query), {"starlisting_id": starlisting_id})
             row = result.mappings().fetchone()
 
-        return self._row_to_arena_response(row) if row else None
+            if not row:
+                return None
+
+            # Fetch strategy IDs for this arena
+            arena_id = row["id"]
+            strategy_map = self._get_strategy_ids_for_arenas([arena_id], conn)
+            return self._row_to_arena_response(row, strategy_map.get(arena_id, []))
 
     def get_arena_summary(self, arena_id: int) -> Optional[ArenaSummary]:
         """Get lightweight arena summary for embedding.
@@ -247,6 +268,83 @@ class ArenaService:
             exchange=row["exchange"],
             market_type=row["market_type"],
         )
+
+    def get_popular_arenas(self, limit: int = 10) -> List[PopularArenaResponse]:
+        """Get arenas ranked by number of strategies using them.
+
+        Args:
+            limit: Maximum number of arenas to return
+
+        Returns:
+            List of arenas with strategy counts, ordered by popularity
+        """
+        engine = self.state_manager._get_engine()
+
+        query = """
+            SELECT
+                a.*,
+                c.id as coin_id, c.symbol as coin_symbol, c.name as coin_name,
+                q.id as quote_id, q.symbol as quote_symbol, q.name as quote_name,
+                e.id as exchange_id, e.slug as exchange_slug, e.display_name as exchange_display,
+                mt.id as market_type_id, mt.type as market_type_type, mt.display as market_type_display,
+                COUNT(s.id) as strategy_count
+            FROM arenas a
+            JOIN coins c ON a.coin_id = c.id
+            JOIN coins q ON a.quote_id = q.id
+            JOIN exchanges e ON a.exchange_id = e.id
+            JOIN market_types mt ON a.market_type_id = mt.id
+            LEFT JOIN strategies s ON s.arena_id = a.id
+            GROUP BY a.id, c.id, c.symbol, c.name, q.id, q.symbol, q.name,
+                     e.id, e.slug, e.display_name, mt.id, mt.type, mt.display
+            ORDER BY strategy_count DESC, a.trading_pair
+            LIMIT :limit
+        """
+
+        with engine.connect() as conn:
+            result = conn.execute(text(query), {"limit": limit})
+            rows = list(result.mappings())
+
+            # Batch fetch strategy IDs for all arenas
+            arena_ids = [row["id"] for row in rows]
+            strategy_map = self._get_strategy_ids_for_arenas(arena_ids, conn)
+
+            return [
+                PopularArenaResponse(
+                    id=row["id"],
+                    starlisting_id=row["starlisting_id"],
+                    trading_pair=row["trading_pair"],
+                    trading_pair_id=row["trading_pair_id"],
+                    coin=CoinResponse(
+                        id=row["coin_id"],
+                        symbol=row["coin_symbol"],
+                        name=row["coin_name"],
+                    ),
+                    quote=CoinResponse(
+                        id=row["quote_id"],
+                        symbol=row["quote_symbol"],
+                        name=row["quote_name"],
+                    ),
+                    exchange=ExchangeResponse(
+                        id=row["exchange_id"],
+                        slug=row["exchange_slug"],
+                        name=row["exchange_display"],
+                    ),
+                    market_type=MarketTypeResponse(
+                        id=row["market_type_id"],
+                        type=row["market_type_type"],
+                        name=row["market_type_display"],
+                    ),
+                    interval=row["interval"],
+                    interval_seconds=row["interval_seconds"],
+                    is_active=bool(row["is_active"]),
+                    last_synced_at=row["last_synced_at"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    strategy_count=row["strategy_count"],
+                    strategies=strategy_map.get(row["id"], []),
+                )
+                for row in rows
+            ]
 
     # =========================================================================
     # Kirby API Sync Methods
@@ -513,8 +611,53 @@ class ArenaService:
     # Helper Methods
     # =========================================================================
 
-    def _row_to_arena_response(self, row) -> ArenaResponse:
-        """Convert database row to ArenaResponse."""
+    def _get_strategy_ids_for_arenas(
+        self, arena_ids: List[int], conn=None
+    ) -> Dict[int, List[int]]:
+        """Get strategy IDs for multiple arenas in a single query.
+
+        Args:
+            arena_ids: List of arena IDs to fetch strategies for
+            conn: Optional database connection (will create one if not provided)
+
+        Returns:
+            Dict mapping arena_id to list of strategy IDs
+        """
+        if not arena_ids:
+            return {}
+
+        engine = self.state_manager._get_engine()
+
+        query = """
+            SELECT arena_id, id
+            FROM strategies
+            WHERE arena_id = ANY(:arena_ids) AND is_active = TRUE
+            ORDER BY arena_id, id
+        """
+
+        def execute_query(connection):
+            result = connection.execute(text(query), {"arena_ids": arena_ids})
+            strategy_map: Dict[int, List[int]] = {aid: [] for aid in arena_ids}
+            for row in result.mappings():
+                strategy_map[row["arena_id"]].append(row["id"])
+            return strategy_map
+
+        if conn:
+            return execute_query(conn)
+        else:
+            with engine.connect() as connection:
+                return execute_query(connection)
+
+    def _row_to_arena_response(self, row, strategy_ids: Optional[List[int]] = None) -> ArenaResponse:
+        """Convert database row to ArenaResponse.
+
+        Args:
+            row: Database row with arena and joined lookup data
+            strategy_ids: Optional list of strategy IDs for this arena
+
+        Returns:
+            ArenaResponse with all fields populated
+        """
         return ArenaResponse(
             id=row["id"],
             starlisting_id=row["starlisting_id"],
@@ -546,4 +689,5 @@ class ArenaService:
             last_synced_at=row["last_synced_at"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            strategies=strategy_ids if strategy_ids is not None else [],
         )

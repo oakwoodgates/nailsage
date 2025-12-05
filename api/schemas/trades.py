@@ -33,6 +33,7 @@ class TradeResponse(TradeBase):
     # Enriched fields (optional, populated when joining with other tables)
     strategy_name: Optional[str] = Field(None, description="Strategy name")
     position_side: Optional[str] = Field(None, description="Position side (long/short)")
+    arena_id: Optional[int] = Field(None, description="Arena ID")
 
     model_config = {"from_attributes": True}
 

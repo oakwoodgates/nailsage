@@ -105,6 +105,93 @@ class StrategyService:
 
         return strategies
 
+    def get_strategies_by_arena(
+        self, arena_id: int, active_only: bool = True
+    ) -> List[StrategyResponse]:
+        """Get strategies for a specific arena.
+
+        Args:
+            arena_id: Arena ID
+            active_only: If True, return only active strategies
+
+        Returns:
+            List of strategy responses for the arena
+        """
+        engine = self.state_manager._get_engine()
+
+        from sqlalchemy import text
+
+        # Query with LEFT JOIN to arenas for arena summary data
+        query = """
+            SELECT
+                s.*,
+                a.id as arena_db_id,
+                a.starlisting_id as arena_starlisting_id,
+                a.trading_pair,
+                a.interval as arena_interval,
+                c.symbol as coin,
+                c.name as coin_name,
+                q.symbol as quote,
+                q.name as quote_name,
+                e.slug as exchange,
+                e.display_name as exchange_name,
+                mt.type as market_type,
+                mt.display as market_name
+            FROM strategies s
+            LEFT JOIN arenas a ON s.arena_id = a.id
+            LEFT JOIN coins c ON a.coin_id = c.id
+            LEFT JOIN coins q ON a.quote_id = q.id
+            LEFT JOIN exchanges e ON a.exchange_id = e.id
+            LEFT JOIN market_types mt ON a.market_type_id = mt.id
+            WHERE s.arena_id = :arena_id
+        """
+
+        if active_only:
+            query += " AND s.is_active = TRUE"
+
+        query += " ORDER BY s.created_at DESC"
+
+        with engine.connect() as conn:
+            result = conn.execute(text(query), {"arena_id": arena_id})
+
+            strategies = []
+            for row in result.mappings():
+                # Build arena summary if arena_id exists
+                arena = None
+                if row.get("arena_id") and row.get("arena_db_id"):
+                    arena = ArenaSummary(
+                        id=row["arena_db_id"],
+                        starlisting_id=row["arena_starlisting_id"],
+                        trading_pair=row["trading_pair"],
+                        interval=row["arena_interval"],
+                        coin=row["coin"],
+                        coin_name=row["coin_name"],
+                        quote=row["quote"],
+                        quote_name=row["quote_name"],
+                        exchange=row["exchange"],
+                        exchange_name=row["exchange_name"],
+                        market_type=row["market_type"],
+                        market_name=row["market_name"],
+                    )
+
+                strategies.append(StrategyResponse(
+                    id=row["id"],
+                    strategy_name=row["strategy_name"],
+                    version=row["version"],
+                    starlisting_id=row["starlisting_id"],
+                    arena_id=row.get("arena_id"),
+                    interval=row["interval"],
+                    model_id=row["model_id"],
+                    is_active=bool(row["is_active"]),
+                    initial_bankroll=float(row["initial_bankroll"]) if row.get("initial_bankroll") else 10000.0,
+                    current_bankroll=float(row["current_bankroll"]) if row.get("current_bankroll") else 10000.0,
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    arena=arena,
+                ))
+
+        return strategies
+
     def get_strategy_by_id(self, strategy_id: int) -> Optional[StrategyResponse]:
         """Get strategy by ID.
 

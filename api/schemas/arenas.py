@@ -71,6 +71,9 @@ class ArenaResponse(TimestampMixin):
     is_active: bool = Field(description="Whether arena is active/tradeable")
     last_synced_at: Optional[int] = Field(None, description="Last Kirby sync timestamp (Unix ms)")
 
+    # Strategy IDs using this arena
+    strategies: List[int] = Field(default_factory=list, description="IDs of active strategies using this arena")
+
     model_config = {"from_attributes": True}
 
 
@@ -103,6 +106,19 @@ class ArenaListResponse(BaseModel):
 
     arenas: List[ArenaResponse] = Field(description="List of arenas")
     total: int = Field(description="Total number of arenas")
+
+
+class PopularArenaResponse(ArenaResponse):
+    """Arena response with strategy count for popularity ranking."""
+
+    strategy_count: int = Field(description="Number of strategies using this arena")
+
+
+class PopularArenaListResponse(BaseModel):
+    """Response for popular arenas endpoint."""
+
+    arenas: List[PopularArenaResponse] = Field(description="List of arenas ranked by popularity")
+    total: int = Field(description="Total number of arenas returned")
 
 
 class ExchangeListResponse(BaseModel):
