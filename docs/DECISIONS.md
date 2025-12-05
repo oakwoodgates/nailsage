@@ -199,25 +199,26 @@
 
 ---
 
-## ADR-010: 3-Class Classification for Directional Prediction
-**Date**: 2025-11-06
-**Status**: Accepted
+## ADR-010: Binary Classification for Directional Trading
+**Date**: 2025-11-06 (Updated: 2025-12-05)
+**Status**: Accepted (Revised)
 
 **Context**: Choose ML task type for trading signals.
 
-**Decision**: Start with 3-class classification (long/short/neutral) with confidence scores.
+**Decision**: Use binary classification (long/short only) with confidence-based filtering and signal cooldown.
 
 **Rationale**:
-- Clear interpretation: direction + confidence
-- Can use confidence for position sizing
-- Handles sideways/choppy markets (neutral class)
-- Standard evaluation metrics (precision, recall, F1)
+- Forces clear directional decisions (no neutral hedging)
+- Confidence filtering prevents low-quality signals
+- Signal cooldown prevents excessive trading frequency
+- Simpler evaluation metrics and model interpretation
+- Better suited for high-frequency directional strategies
 
 **Consequences**:
-- Need to define threshold for "neutral" zone
-- Class imbalance likely (more neutral than directional moves)
-- May experiment with regression in future strategies
-- Each strategy can define its own target variable
+- No neutral class - models must choose direction
+- Confidence thresholds prevent weak signals
+- Cooldown mechanism prevents spam trading
+- Requires different target variable creation logic
 
 ---
 
@@ -301,8 +302,6 @@
 
 ---
 
-## Template for New Decisions
-
 ```markdown
 ## ADR-013: No Backward Compatibility in Alpha Phase
 **Date**: 2025-11-15
@@ -341,26 +340,6 @@ Once we deploy to production or have external users:
 2. Maintain backward compatibility within major versions
 3. Provide migration guides for major version upgrades
 4. Add deprecation warnings before removing features
-
----
-
-## ADR-XXX: [Title]
-**Date**: YYYY-MM-DD
-**Status**: [Proposed | Accepted | Deprecated | Superseded]
-
-**Context**: [What is the issue we're trying to solve?]
-
-**Decision**: [What we decided to do]
-
-**Rationale**:
-- Reason 1
-- Reason 2
-- Reason 3
-
-**Consequences**:
-- Consequence 1
-- Consequence 2
-```
 
 ---
 

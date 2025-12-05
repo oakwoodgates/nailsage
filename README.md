@@ -8,9 +8,7 @@ Named after the Great Nailsage Sly, trainer of the Nailmasters, from Hollow Knig
 
 NailSage is a production-ready ML trading research platform designed for building, testing, and deploying machine learning trading strategies with rigorous validation and complete reproducibility.
 
-**Current Status**: MVP Complete (35/35 milestones, 100%) ✅ - Paper trading operational with model quality improvements
-
-**Phase 1 Focus**: Classical ML (XGBoost, LightGBM, Random Forest) with walk-forward validation
+**Status**: Production ML Trading Platform ✅ - Live paper trading operational
 
 ## ✨ Key Features
 
@@ -20,16 +18,12 @@ NailSage is a production-ready ML trading research platform designed for buildin
 - **✅ Hybrid Model Registry**: Track configuration intent and training history
 - **✅ Dynamic Feature Engineering**: 18 technical indicators computed on-the-fly
 - **✅ Modular Architecture**: Independent strategies with centralized model management
-- **✅ Binary Classification Models**: Phase 10 aggressive trading with SHORT/LONG signals
-- **✅ Confidence-Based Filtering**: Minimum confidence thresholds for signal generation
-- **✅ Signal Cooldown**: Prevents spam with minimum bars between signals
-- **✅ Real-Time P&L Updates**: Position profitability updated every candle
-- **✅ Transparent Decision Logging**: See why signals are generated or suppressed
-- **✅ Smart Feature Caching**: Enabled for training/backtesting, disabled for live trading
-- **✅ Per-Strategy Bankroll**: Isolated $10k bankroll per strategy with percentage-based sizing
-- **✅ Automatic Position Sizing**: Trades sized at 10% of current strategy bankroll
-- **✅ Bankroll Depletion Protection**: Strategies auto-pause when bankroll <= $0
-- **✅ Arena Metadata**: Trading arena data (exchange, pair, interval) synced from Kirby API
+- **✅ Binary Classification Models**: SHORT/LONG signals with confidence filtering
+- **✅ Real-Time Execution**: Live paper trading with realistic market simulation
+- **✅ Risk Management**: Per-strategy bankrolls with automatic position sizing
+- **✅ Transparent Logging**: Complete audit trail of signal generation and execution
+- **✅ Production Deployment**: Docker-based multi-strategy execution
+- **✅ Walk-Forward Validation**: Time series cross-validation preventing data leakage
 
 ## 🚀 Quick Start
 
@@ -255,43 +249,22 @@ assert lookback_window < split_start_timestamp
 **Model Registry**:
 - ModelMetadata, ModelRegistry, Hybrid ID system
 
-## 🎓 Next Steps
+## 📚 Documentation
 
-**Ready to train your first model?** See [MODEL_TRAINING.md](docs/MODEL_TRAINING.md) for comprehensive training and validation guide.
+**Getting Started**:
+- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - Complete training and validation guide
+- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment and paper trading
+- [docs/ACTIVE_FILES.md](docs/ACTIVE_FILES.md) - Codebase structure reference
 
-**Key Documentation**:
-- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) - Training, validation, and backtesting guide
-- [docs/API.md](docs/API.md) - REST API reference (strategies, arenas, trades, positions)
-- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment guide
-- [docs/STRATEGY_GUIDE.md](docs/STRATEGY_GUIDE.md) - Strategy implementation guide (legacy)
-- [.claude/PROJECT_CONTEXT.md](.claude/PROJECT_CONTEXT.md) - Complete project overview
-- [.claude/STATUS.md](.claude/STATUS.md) - Current status and progress
-- [.claude/DECISIONS.md](.claude/DECISIONS.md) - Architectural Decision Records
+**API & Integration**:
+- [docs/API.md](docs/API.md) - REST API for portfolio management
+- [docs/WEBSOCKET.md](docs/WEBSOCKET.md) - Real-time WebSocket connections
+- [docs/DATABASE.md](docs/DATABASE.md) - Database schema and operations
 
-## 📈 Current Status
+**Architecture**:
+- [docs/DECISIONS.md](docs/DECISIONS.md) - Key architectural decisions
+- [docs/FEATURE_SCHEMA_USAGE.md](docs/FEATURE_SCHEMA_USAGE.md) - Feature engineering details
 
-**MVP Complete** (35/35 milestones): ✅
-- ✅ Core infrastructure & configuration (Phases 1-5)
-- ✅ Data pipeline with quality validation
-- ✅ Feature engineering (10 indicators)
-- ✅ Validation framework (walk-forward, backtesting)
-- ✅ Model registry with hybrid IDs
-- ✅ Multi-algorithm support (XGBoost, LightGBM, RandomForest, ExtraTrees)
-- ✅ Portfolio coordination system
-- ✅ Paper trading infrastructure (Phase 8-9)
-  - WebSocket client with Kirby API integration
-  - Live inference pipeline
-  - State persistence (SQLite)
-- ✅ Model quality improvements (Phase 10)
-  - Binary classification support
-  - Confidence-based position sizing
-  - Trade cooldown mechanism
-  - Hyperparameter optimization
-- ✅ Unit tests (145 passing)
-
-**Ready for Production Testing**:
-- Paper trading validation with real models
-- Extended monitoring and performance tracking
 
 ## 🔬 Testing
 

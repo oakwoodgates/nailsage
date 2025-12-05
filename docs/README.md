@@ -7,209 +7,190 @@
 
 ---
 
-## Quick Start
+## Documentation Overview
 
-### Project Overview
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - High-level overview, goals, tech stack, and architecture
-- [ACTIVE_FILES.md](ACTIVE_FILES.md) - Single source of truth for active vs deprecated files
-- [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - Detailed progress tracker
-- [DOCKER.md](DOCKER.md) - Docker deployment and multi-strategy execution guide
+### Getting Started
+- [MODEL_TRAINING.md](MODEL_TRAINING.md) - Complete guide to training and validating ML models
+- [DOCKER.md](DOCKER.md) - Docker deployment and multi-strategy execution
+- [ACTIVE_FILES.md](ACTIVE_FILES.md) - Current codebase structure and file inventory
 
-### Strategy Development
-- [MODEL_TRAINING.md](MODEL_TRAINING.md) - How to train and validate models
-- [DOCKER.md](DOCKER.md) - How to deploy strategies with Docker
-- [DECISIONS.md](DECISIONS.md) - See ADR-014 (Binary Classification) and ADR-015 (Feature Caching) for Phase 10 improvements
-
-### Architecture & Decisions
-- [DECISIONS.md](DECISIONS.md) - Architectural Decision Records (ADRs) documenting key design choices
-- [DATABASE.md](DATABASE.md) - Database schema, tables, views, and usage examples
+### Architecture & API
+- [API.md](API.md) - REST API endpoints and usage
+- [WEBSOCKET.md](WEBSOCKET.md) - Real-time WebSocket connections
+- [DATABASE.md](DATABASE.md) - Database schema and operations
+- [FEATURE_SCHEMA_USAGE.md](FEATURE_SCHEMA_USAGE.md) - Feature engineering and validation
+- [DECISIONS.md](DECISIONS.md) - Key architectural decisions and rationale
 
 ---
 
 ## Document Guide
 
-### 📋 [STATUS.md](STATUS.md)
-**What**: Current project status snapshot
-**When to read**: Want to know what's working, what's in progress, what's next
+### 🚀 [MODEL_TRAINING.md](MODEL_TRAINING.md)
+**What**: Complete guide to training, validating, and deploying ML trading models
+**When to read**: New to ML training workflow or need detailed procedures
 **Key sections**:
-- Recent accomplishments (Portfolio Coordinator MVP, SOL strategy, refactoring)
-- Active strategies (BTC momentum classifier, SOL swing classifier)
-- System capabilities and limitations
-- Next milestones
+- Data preparation and feature engineering
+- Model training with walk-forward validation
+- Backtesting and performance evaluation
+- Strategy deployment and monitoring
 
-### 📊 [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)
-**What**: Granular progress tracker with 25 milestones
-**When to read**: Want to see detailed completion status
+### 🐳 [DOCKER.md](DOCKER.md)
+**What**: Production deployment guide using Docker containers
+**When to read**: Setting up paper trading or production deployment
 **Key sections**:
-- Phase 1-6: Foundation, Validation, First Strategy, Modularity, Refactoring, Portfolio
-- Phase 7: Live Trading Infrastructure (next up)
-- Notes on backward compatibility, script reusability, git strategy
+- Single and multi-strategy execution
+- Environment configuration
+- Database setup and monitoring
+- Troubleshooting deployment issues
 
-### 🎯 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
-**What**: High-level project vision and architecture
-**When to read**: New to the project or need to understand design philosophy
+### 📋 [ACTIVE_FILES.md](ACTIVE_FILES.md)
+**What**: Current codebase structure and file inventory
+**When to read**: Understanding project organization or finding specific files
 **Key sections**:
-- Phase 1 MVP goals
-- Independent models philosophy
-- Technology stack
-- Success criteria
-- Project structure
-- Completed components
+- Directory structure overview
+- File status and descriptions
+- Development guidelines
 
-### 📖 [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md)
-**What**: Practical guide for creating trading strategies
-**When to read**: Want to add a new strategy
+### 🔌 [API.md](API.md)
+**What**: REST API documentation for portfolio management and strategy monitoring
+**When to read**: Building integrations or monitoring trading performance
 **Key sections**:
-- Configuration sections (data, features, target, model, validation, backtest, risk)
-- Example strategies (BTC momentum, SOL swing)
-- Training and validation workflows
-- Best practices
+- Authentication and endpoints
+- Portfolio data retrieval
+- Real-time updates and WebSocket connections
 
 ### 🏛️ [DECISIONS.md](DECISIONS.md)
-**What**: Architectural Decision Records (ADRs)
-**When to read**: Want to understand why specific design choices were made
+**What**: Key architectural decisions and design rationale
+**When to read**: Understanding why certain design choices were made
 **Key decisions**:
-- ADR-001: Independent Models vs Portfolio Optimization
-- ADR-002: Classical ML for Phase 1
-- ADR-010: 3-Class Classification
-- ADR-012: Hybrid Model ID System
-- ADR-013: No Backward Compatibility in Alpha
+- Independent Models vs Portfolio Optimization
+- Classical ML selection
+- Configuration management approach
+- Model identification system
 
 ---
 
-## Project Status Summary
+## Platform Overview
 
-### ✅ What's Working
-1. **Binary Classification Models** - Phase 10 aggressive trading (SHORT/LONG only, no neutral)
-2. **Live Multi-Strategy Execution** - Docker-based paper trading with multiple strategies per exchange
-3. **Real-Time P&L Tracking** - Position profitability updated every candle
-4. **Transparent Signal Logging** - See exactly why signals are generated or suppressed
-5. **Walk-Forward Validation** - Time series cross-validation with realistic backtesting
-6. **Config-Driven Development** - Define strategies in YAML, zero code changes needed
-7. **Smart Feature Caching** - Enabled for training, disabled for live trading
-8. **Model Registry** - Centralized tracking with hybrid ID system for reproducibility
+### 🎯 Core Capabilities
+1. **ML Model Training** - Automated training pipeline with walk-forward validation
+2. **Paper Trading Execution** - Real-time strategy execution with realistic simulation
+3. **Multi-Strategy Support** - Run multiple strategies simultaneously per exchange
+4. **Real-Time Monitoring** - Live P&L tracking and signal transparency
+5. **Production Deployment** - Docker-based deployment with PostgreSQL persistence
+6. **Config-Driven Architecture** - Define strategies in YAML, no code changes needed
+7. **Model Registry** - Centralized model tracking with reproducibility features
 
-### 🎯 Current Phase: Phase 10 Complete ✅
-- ✅ Binary classification (SHORT/LONG signals)
-- ✅ Confidence-based filtering (minimum thresholds)
-- ✅ Signal cooldown (prevents spam)
-- ✅ Real-time P&L updates
-- ✅ Signal suppression logging
-- ✅ Live paper trading operational
-- ✅ Multi-strategy Docker deployment
-
-### 📊 By The Numbers
-- **Live Trading**: Operational with real-time execution
-- **Strategies**: Multi-strategy support (Binance, Hyperliquid)
-- **Model Type**: Binary LightGBM classifiers
-- **Features**: 18 technical indicators (OHLCV excluded from model)
-- **Tests**: 145 unit tests passing
-- **Deployment**: Docker Compose with PostgreSQL
+### 📊 Technical Specifications
+- **Models**: Binary classification LightGBM models
+- **Features**: 18 technical indicators (OHLCV excluded for leak prevention)
+- **Validation**: Walk-forward time series cross-validation
+- **Execution**: Real-time paper trading with fees/slippage simulation
+- **Data**: Time series cryptocurrency market data
+- **Deployment**: Docker Compose with PostgreSQL and Redis
 
 ---
 
 ## Getting Started
 
 ### For New Developers
-1. Read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - Understand the vision and architecture
-2. Read [STATUS.md](STATUS.md) - See current state and capabilities
-3. Review [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md) - Learn how strategies work
-4. Check [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - See what's done and what's next
+1. Read [MODEL_TRAINING.md](MODEL_TRAINING.md) - Learn the ML training workflow
+2. Read [DOCKER.md](DOCKER.md) - Understand deployment and execution
+3. Review [ACTIVE_FILES.md](ACTIVE_FILES.md) - Understand codebase structure
+4. Check [DECISIONS.md](DECISIONS.md) - Learn key architectural choices
 
 ### For Strategy Development
-1. Read [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md) - Comprehensive guide
-2. Look at existing configs in `configs/strategies/`
-3. Review training scripts in `strategies/short_term/`
-4. Check validation results in `results/walk_forward_results/`
+1. Read [MODEL_TRAINING.md](MODEL_TRAINING.md) - Complete training guide
+2. Examine existing strategy configs in `strategies/`
+3. Review training scripts in `training/cli/`
+4. Check validation results in `results/`
 
-### For Architecture Understanding
-1. Read [DECISIONS.md](DECISIONS.md) - Understand key design choices
-2. Review [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - See project structure
-3. Check code in relevant modules (`features/`, `training/validation/`, `execution/portfolio/`)
+### For System Integration
+1. Read [API.md](API.md) - REST API documentation
+2. Read [WEBSOCKET.md](WEBSOCKET.md) - Real-time data connections
+3. Review [DATABASE.md](DATABASE.md) - Data persistence layer
 
 ---
 
 ## Key Concepts
 
-### Independent Models Philosophy (ADR-001)
-- Each strategy operates autonomously
-- Strategies can have opposing signals (this is valid!)
+### Independent Models Philosophy
+- Each strategy operates autonomously with its own risk management
+- Strategies can have opposing signals simultaneously (this is valid)
 - Portfolio Coordinator enforces global risk limits only
-- No portfolio optimization in Phase 1 (deferred to Phase 2)
+- Focus on individual model quality rather than portfolio optimization
 
-### Hybrid Model IDs (ADR-012)
+### Hybrid Model IDs
 Format: `{config_hash}_{timestamp}_{random_suffix}`
 - **Config hash**: What you're training (deterministic from hyperparameters)
 - **Timestamp**: When you trained it (YYYYMMDD_HHMMSS)
 - **Random suffix**: Prevents collisions
 
-Enables:
-- Finding all training runs of the same config
-- Chronological ordering
-- Audit trail
-- No coordination needed
-
-### 3-Class Classification (ADR-010)
-- **Short (0)**: Price expected to drop more than threshold
-- **Neutral (1)**: Price expected to move within ±threshold
-- **Long (2)**: Price expected to rise more than threshold
-
 Benefits:
-- Handles sideways markets (neutral class)
-- Clear interpretation (direction + confidence)
-- Confidence scores can drive position sizing
+- Track all training runs of the same configuration
+- Chronological ordering and audit trails
+- Reproducibility and experiment management
+
+### Binary Classification Models
+- **Short (0)**: Price expected to drop more than threshold
+- **Long (1)**: Price expected to rise more than threshold
+
+Design choices:
+- No neutral class (forces directional decisions)
+- Confidence-based filtering prevents low-quality signals
+- Signal cooldown prevents trading frequency issues
 
 ### Walk-Forward Validation
-- Time series cross-validation preventing look-ahead bias
+- Time series cross-validation preventing data leakage
 - Multiple validation windows across different market regimes
-- Realistic backtesting (transaction costs, slippage, leverage)
-- Aggregate metrics and consistency scoring
+- Realistic backtesting with transaction costs, slippage, and leverage
+- Comprehensive performance metrics and consistency scoring
 
 ---
 
 ## Development Principles
 
-1. **Data Leakage Prevention** - Strict timestamp validation, lookback-aware features
-2. **Validation Rigor** - Walk-forward validation, multiple windows, realistic costs
-3. **Production Readiness** - Well-documented, tested code with error handling
-4. **Modularity First** - Config-driven, reusable components
-5. **No Backward Compatibility (Alpha)** - ADR-013: Breaking changes allowed, iterate fast
+1. **Data Leakage Prevention** - Strict temporal ordering, lookback-aware features
+2. **Rigorous Validation** - Walk-forward cross-validation with realistic market simulation
+3. **Production Ready** - Well-tested, documented code with comprehensive error handling
+4. **Config-Driven Architecture** - YAML-based strategy definitions, minimal code changes
+5. **Modular Design** - Independent, reusable components with clear interfaces
 
 ---
 
-## File Organization
-
-### Documentation (`docs/`)
-- This file - Index to all documentation
-- Strategy guides, status reports, checklists
-- Architectural decision records
-
-### Configuration (`config/` and `configs/`)
-- `config/` - Python Pydantic models (type-safe config classes)
-- `configs/` - YAML files (actual strategy configurations)
+## Architecture Overview
 
 ### Core Modules
-- `data/` - Loading, validation, metadata
-- `features/` - Feature engineering, indicators
-- `validation/` - Walk-forward, backtesting, metrics
-- `models/` - Model registry, metadata, trained artifacts
-- `execution/portfolio/` - Coordinator, positions, signals
-- `strategies/` - Training and validation scripts
-- `utils/` - Logging, helpers
+- `config/` - Pydantic configuration models (type-safe configs)
+- `data/` - Data loading, validation, and metadata management
+- `features/` - Technical indicator computation and feature engineering
+- `models/` - Model registry, metadata, and trained artifacts
+- `training/` - ML training pipeline and validation
+- `execution/` - Paper trading execution and portfolio management
+- `utils/` - Shared utilities and logging
 
-### Tests
+### Configuration & Strategies
+- `strategies/` - YAML strategy configurations (gitignored)
+- `results/` - Training and backtesting results (gitignored)
+
+### Testing
 - `tests/unit/` - Unit tests for individual components
-- `tests/integration/` - End-to-end workflow tests
+- `tests/integration/` - End-to-end workflow and integration tests
+
+### Documentation
+- `docs/` - Complete documentation set
+- `README.md` - Main project documentation
 
 ---
 
-## Contact & Support
+## Support & Resources
 
 For questions about:
-- **Strategy development** → See [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md)
-- **Current status** → See [STATUS.md](STATUS.md)
+- **Training ML models** → See [MODEL_TRAINING.md](MODEL_TRAINING.md)
+- **Deploying strategies** → See [DOCKER.md](DOCKER.md)
+- **API integration** → See [API.md](API.md)
 - **Design decisions** → See [DECISIONS.md](DECISIONS.md)
-- **Implementation details** → Check module-specific READMEs (if available)
+- **Codebase structure** → See [ACTIVE_FILES.md](ACTIVE_FILES.md)
 
 ---
 

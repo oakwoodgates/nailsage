@@ -118,8 +118,7 @@ All models use the **same training infrastructure** with strategy-specific YAML 
 **Status**: ⚠️ **DEPRECATED** (See [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md) deprecation notice)
 
 Old approach used per-strategy training scripts:
-- `strategies/short_term/train_btc_momentum.py`
-- `strategies/long_term/train_sol_swing.py`
+- Training handled by `training/cli/train_model.py` with YAML configs
 
 These are kept for reference but **should not be used for new strategies**.
 
@@ -146,7 +145,6 @@ nailsage/
 │   ├── train_model.py         # Generic training (✅ ACTIVE)
 │   ├── validate_model.py      # Validation (✅ ACTIVE)
 │   └── run_backtest.py        # Backtesting (✅ ACTIVE)
-├── strategies/                # Legacy strategy-specific code (⚠️ DEPRECATED)
 └── docs/
     ├── ACTIVE_FILES.md        # This file (✅ ACTIVE)
     ├── DATABASE.md            # Database schema and usage (✅ ACTIVE)
@@ -168,7 +166,7 @@ nailsage/
 ### "I need to add a new strategy" → What do I do?
 
 1. Create YAML config in `strategies/my_strategy_v1.yaml`
-2. Train: `python training/cli/train_model.py --config configs/strategies/my_strategy_v1.yaml`
+2. Train: `python training/cli/train_model.py --config strategies/my_strategy_v1.yaml`
 3. Deploy: Update `docker-compose.yml` environment variables
 4. See [MODEL_TRAINING.md](MODEL_TRAINING.md) for details
 
