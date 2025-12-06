@@ -14,6 +14,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+import pytest
+
+
+@pytest.mark.skip("Requires live Kirby websocket; skipped in CI.")
 async def test_historical_candles():
     """Test connection and log all incoming messages."""
     url = "ws://localhost:8000/ws?api_key=kb_abc9fca6194efa30f1c1b36b875fd6e43b897ec6"
