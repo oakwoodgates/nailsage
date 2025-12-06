@@ -112,8 +112,14 @@ class Validator:
         set_random_seeds()
         t_start = time.perf_counter()
 
-        # Generate splits
-        splits = self.splitter.split(df_clean, timestamp_column='timestamp')
+        # Generate splits (optionally load/persist)
+        persist_path = getattr(self.config.validation, "split_cache_path", None) if self.config.validation else None
+        splits = self.splitter.split(
+            df_clean,
+            timestamp_column='timestamp',
+            persist_path=persist_path,
+            load_existing=getattr(self.config.validation, "load_splits", False) if self.config.validation else False,
+        )
         logger.info(f"Generated {len(splits)} validation splits")
 
         # Run validation on each split
@@ -140,7 +146,7 @@ class Validator:
         # Log aggregate results
         self._log_aggregate_results(aggregate_results)
         t_end = time.perf_counter()
-        logger.info(f"Validation runtime: {t_end - t_start:.2f}s")
+        logger.info("Validation runtime", extra={"event": "validation_runtime", "seconds": round(t_end - t_start, 2)})
 
         return validation_results
 
@@ -187,12 +193,19 @@ class Validator:
 
         # Log split results
         logger.info("Split Results:")
-        logger.info(f"  Accuracy: {val_acc:.4f}")
-        logger.info(f"  Total Return: {backtest_metrics.total_return * 100:.2f}%")
-        logger.info(f"  Sharpe Ratio: {backtest_metrics.sharpe_ratio:.2f}")
-        logger.info(f"  Max Drawdown: {backtest_metrics.max_drawdown * 100:.2f}%")
-        logger.info(f"  Win Rate: {backtest_metrics.win_rate * 100:.2f}%")
-        logger.info(f"  Total Trades: {backtest_metrics.total_trades}")
+        logger.info(
+            "Split metrics",
+            extra={
+                "event": "validation_split",
+                "split": split.split_index + 1,
+                "accuracy": val_acc,
+                "total_return": backtest_metrics.total_return,
+                "sharpe_ratio": backtest_metrics.sharpe_ratio,
+                "max_drawdown": backtest_metrics.max_drawdown,
+                "win_rate": backtest_metrics.win_rate,
+                "total_trades": backtest_metrics.total_trades,
+            },
+        )
 
         return {
             'split': split.split_index + 1,
@@ -289,17 +302,22 @@ class Validator:
         logger.info("AGGREGATE VALIDATION RESULTS")
         logger.info(f"{'='*70}")
 
-        logger.info(f"Average Validation Accuracy: {aggregate['avg_val_accuracy']:.4f}")
-        logger.info(f"Average Precision: {aggregate['avg_precision']:.4f}")
-        logger.info(f"Average Recall: {aggregate['avg_recall']:.4f}")
-        logger.info(f"Average F1: {aggregate['avg_f1']:.4f}")
-        logger.info(f"Average Total Return: {aggregate['avg_total_return'] * 100:.2f}%")
-        logger.info(f"Average Sharpe Ratio: {aggregate['avg_sharpe_ratio']:.2f}")
-        logger.info(f"Average Max Drawdown: {aggregate['avg_max_drawdown'] * 100:.2f}%")
-        logger.info(f"Average Win Rate: {aggregate['avg_win_rate'] * 100:.2f}%")
-        logger.info(f"Total Trades (all splits): {aggregate['total_trades']}")
         n_splits = aggregate.get('n_splits', getattr(self.splitter, "n_splits", 0))
-        logger.info(f"Consistency: {aggregate['consistency_pct'] * 100:.1f}% ({aggregate['positive_splits']}/{n_splits} splits profitable)")
+        logger.info("Aggregate metrics", extra={
+            "event": "validation_aggregate",
+            "avg_val_accuracy": aggregate['avg_val_accuracy'],
+            "avg_precision": aggregate['avg_precision'],
+            "avg_recall": aggregate['avg_recall'],
+            "avg_f1": aggregate['avg_f1'],
+            "avg_total_return": aggregate['avg_total_return'],
+            "avg_sharpe_ratio": aggregate['avg_sharpe_ratio'],
+            "avg_max_drawdown": aggregate['avg_max_drawdown'],
+            "avg_win_rate": aggregate['avg_win_rate'],
+            "total_trades": aggregate['total_trades'],
+            "consistency_pct": aggregate['consistency_pct'],
+            "positive_splits": aggregate['positive_splits'],
+            "n_splits": n_splits,
+        })
         logger.info(f"{'='*70}")
 
     def _create_model(self):

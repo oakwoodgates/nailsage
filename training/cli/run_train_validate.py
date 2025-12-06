@@ -24,10 +24,13 @@ def main():
     parser.add_argument("--no-save", action="store_true", help="Skip saving results to disk.")
     parser.add_argument("--summary", action="store_true", help="Print concise summary only.")
     parser.add_argument("--dry-run", action="store_true", help="Load config, validate schemas, then exit.")
+    parser.add_argument("--force-cache-bust", action="store_true", help="Ignore feature cache and recompute.")
     args = parser.parse_args()
 
     logger = get_training_logger()
     cfg = StrategyConfig.from_yaml(args.config)
+    if args.force_cache_bust:
+        cfg.feature_cache_enabled = False
 
     if args.dry_run:
         logger.info("Dry run completed: config loaded and validated.")

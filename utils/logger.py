@@ -152,6 +152,23 @@ class CategoryAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
+class ContextAdapter(logging.LoggerAdapter):
+    """
+    Logger adapter that merges a base context into all log records.
+    """
+
+    def __init__(self, logger: logging.Logger, base_extra: Optional[Dict[str, Any]] = None):
+        super().__init__(logger, base_extra or {})
+
+    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple:
+        extra = kwargs.get("extra", {})
+        merged = {**self.extra, **extra}
+        kwargs["extra"] = merged
+        if "extra_data" in kwargs:
+            kwargs["extra"]["extra_data"] = kwargs.pop("extra_data")
+        return msg, kwargs
+
+
 def setup_logger(
     name: str = "nailsage",
     level: int = logging.INFO,
@@ -262,3 +279,16 @@ def get_execution_logger(name: str = "nailsage") -> CategoryAdapter:
 def get_validation_logger(name: str = "nailsage") -> CategoryAdapter:
     """Get logger for validation."""
     return get_logger(CATEGORY_VALIDATION, name)
+
+
+def get_context_logger(base_extra: Optional[Dict[str, Any]] = None, json_format: bool = True, name: str = "nailsage") -> logging.Logger:
+    """
+    Get a logger with base context merged into every record.
+
+    Args:
+        base_extra: dict of fields to include on every log record.
+        json_format: whether to emit JSON logs.
+        name: logger name.
+    """
+    logger = setup_logger(name=name, json_format=json_format)
+    return ContextAdapter(logger, base_extra)

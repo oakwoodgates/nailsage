@@ -78,7 +78,15 @@ pytest tests/unit/ --cov=. --cov-report=term-missing
 
 # Optional end-to-end training pipeline test (requires RUN_E2E_TRAINING=1)
 RUN_E2E_TRAINING=1 pytest tests/integration/training/test_e2e_training_pipeline.py -q
+
+# Integration tests (API + ML pipelines); websocket test is skipped by default
+pytest tests/integration -q
 ```
+
+## Logging
+
+- Training/validation/backtest emit JSON-friendly logs with contextual fields (`strategy`, `version`, `run_id`) and event tags (e.g., `train_start`, `train_timings`, `validation_split`, `validation_aggregate`, `feature_cache_hit`).
+- Use `training/cli/run_train_validate.py --summary` for concise metrics output, `--dry-run` for schema/config validation only, and `--force-cache-bust` to bypass feature cache.
 
 ### 🐳 Docker Quick Start (Recommended for Paper Trading)
 

@@ -57,6 +57,7 @@ class DataPipeline:
         # Load raw data
         df = self._load_raw_data()
         self._validate_raw_schema(df)
+        self._validate_data_quality(df)
 
         # Create target variable
         target_series = self._create_target_variable(df)
@@ -133,6 +134,16 @@ class DataPipeline:
         if df['timestamp'].dt.tz is not None:
             raise ValueError("timestamp column must be timezone-naive")
 
+    def _validate_data_quality(self, df: pd.DataFrame) -> None:
+        """Optional data quality checks: zero volume and outliers."""
+        if df['volume'].le(0).any():
+            raise ValueError("Found zero or negative volume rows in data.")
+        # Basic outlier guard: price sanity (non-negative)
+        price_cols = ['open', 'high', 'low', 'close']
+        for col in price_cols:
+            if (df[col] <= 0).any():
+                raise ValueError(f"Found non-positive prices in column {col}.")
+
     def _validate_feature_schema(self, df_features: pd.DataFrame) -> None:
         """Ensure timestamp is present and no duplicate columns."""
         if "timestamp" not in df_features.columns:
@@ -153,6 +164,8 @@ class DataPipeline:
         """Create target variable based on configured target type."""
         target_type = getattr(self.config.target, "type", None)
         num_classes = self.config.target.classes or 3
+        from training.targets import validate_target_type_supported
+        validate_target_type_supported(target_type)
 
         # Normalize target type for compatibility
         target_type_normalized = (target_type or "").lower()
@@ -191,7 +204,7 @@ class DataPipeline:
         if cache_key:
             cached = self._maybe_load_cache(cache_key)
             if cached is not None:
-                logger.info(f"Loaded features from cache: {cache_key}")
+                logger.info(f"Loaded features from cache: {cache_key}", extra={"event": "feature_cache_hit", "cache_key": cache_key})
                 return cached
 
         df_features = feature_engine.compute_features(df)

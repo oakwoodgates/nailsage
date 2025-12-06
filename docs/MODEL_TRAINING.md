@@ -221,6 +221,16 @@ python scripts/run_backtest.py \
 - **Determinism**: Seeds are set at pipeline start; seeds and per-step timings are logged.
 - **Feature cache (optional)**: Enable `feature_cache_enabled` in strategy config to persist computed features keyed by config+data hash.
 - **Schema validation**: Data pipeline validates required OHLCV columns; feature frames must include `timestamp` and no duplicate columns.
+- **Data quality**: Training data is checked for tz-naive timestamps, non-positive prices, and zero/negative volume.
+- **Split persistence**: Validation splitter can persist/load walk-forward splits via `split_cache_path`/`load_splits` in validation config.
+
+## Logging and CLI
+
+- Logs emit JSON-friendly messages with contextual fields (strategy, version, run_id) and event tags (`train_start`, `train_timings`, `validation_split`, `validation_aggregate`, `feature_cache_hit`).
+- `training/cli/run_train_validate.py`:
+  - `--dry-run`: validate config/schemas only.
+  - `--summary`: concise train/validation metrics in the log.
+  - `--force-cache-bust`: bypass feature cache and recompute features.
 
 ### 🧠 Feature Cache (optional)
 

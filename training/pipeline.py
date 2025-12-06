@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 import time
+from datetime import datetime
 
 import joblib
 import numpy as np
@@ -18,10 +19,10 @@ from models.feature_schema import FeatureSchema
 from training.data_pipeline import DataPipeline
 from training.signal_pipeline import SignalPipeline
 from training.validator import Validator
-from utils.logger import get_training_logger
+from utils.logger import get_context_logger
 from utils.determinism import set_random_seeds, validate_config_consistency
 
-logger = get_training_logger()
+logger = get_context_logger()
 
 
 @dataclass
@@ -68,8 +69,16 @@ class TrainingPipeline:
         self.data_pipeline = DataPipeline(config)
         self.signal_pipeline = SignalPipeline(config)
         self.validator = Validator(config)
+        self.run_id = datetime.utcnow().isoformat()
+        self.logger = get_context_logger(
+            base_extra={
+                "strategy": config.strategy_name,
+                "version": config.version,
+                "run_id": self.run_id,
+            }
+        )
 
-        logger.info(
+        self.logger.info(
             f"Initialized TrainingPipeline for {config.strategy_name} v{config.version} "
             f"(seed={random_seed})"
         )
@@ -89,7 +98,7 @@ class TrainingPipeline:
         Returns:
             TrainingResult with model details and metrics
         """
-        logger.info("Starting training pipeline...")
+        self.logger.info("Starting training pipeline...", extra={"event": "train_start"})
         t0 = time.perf_counter()
 
         # Step 1: Load and prepare data
@@ -104,10 +113,10 @@ class TrainingPipeline:
         df_train = df_clean[train_mask]
         target_train = target_clean[train_mask]
 
-        logger.info(
+        self.logger.info(
             f"Training period: {self.config.train_start} to {self.config.train_end}"
         )
-        logger.info(f"Training samples: {len(df_train):,}")
+        self.logger.info(f"Training samples: {len(df_train):,}")
 
         # Step 3: Prepare features for training
         feature_cols = self.data_pipeline.get_feature_columns(df_train)
@@ -169,15 +178,19 @@ class TrainingPipeline:
             feature_schema=feature_schema,
         )
 
-        logger.info("Training pipeline completed successfully")
-        logger.info(f"Model ID: {result.model_id}")
+        self.logger.info("Training pipeline completed successfully", extra={"event": "train_complete", "model_id": result.model_id})
         t_end = time.perf_counter()
-        logger.info(
-            "Timing (seconds): "
-            f"load={t_load - t0:.2f}, features={t_features - t_load:.2f}, "
-            f"train={t_train - t_features:.2f}, "
-            f"validation={(t_validation - t_train):.2f if not train_only else 0.0:.2f}, "
-            f"total={t_end - t0:.2f}"
+        self.logger.info(
+            "Timing (seconds)",
+            extra={
+                "event": "train_timings",
+                "load": round(t_load - t0, 2),
+                "features": round(t_features - t_load, 2),
+                "train": round(t_train - t_features, 2),
+                "validation": round((t_validation - t_train) if not train_only else 0.0, 2),
+                "total": round(t_end - t0, 2),
+                "model_id": result.model_id,
+            },
         )
 
         return result
@@ -190,13 +203,13 @@ class TrainingPipeline:
         class_weights = self.config.target.class_weights
         sample_weights = np.array([class_weights[label] for label in y_train])
 
-        logger.info(f"Using class weights: {class_weights}")
+        self.logger.info(f"Using class weights: {class_weights}")
 
         # Log class distribution with weights
         for class_label in sorted(class_weights.keys()):
             count = (y_train == class_label).sum()
             weight = class_weights[class_label]
-            logger.info(
+            self.logger.info(
                 f"  Class {class_label}: {count:,} samples, weight={weight:.1f}, "
                 f"effective={count*weight:.1f}"
             )
@@ -211,7 +224,7 @@ class TrainingPipeline:
     ):
         """Create and train the ML model."""
         model_type = self.config.model_type_str
-        logger.info(f"Training {model_type} model...")
+        self.logger.info(f"Training {model_type} model...")
 
         # Import the model creation function from the original script
         model = self._create_model(model_type, self.config.model_params)
@@ -266,7 +279,7 @@ class TrainingPipeline:
         """Evaluate model on given data."""
         predictions = model.predict(X)
         accuracy = float((predictions == y).mean())
-        logger.info(f"Training accuracy: {accuracy:.4f}")
+        self.logger.info(f"Training accuracy: {accuracy:.4f}")
         return accuracy
 
     def _save_model_temporarily(self, model) -> str:
@@ -276,7 +289,7 @@ class TrainingPipeline:
         )
         Path(model_filename).parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(model, model_filename)
-        logger.info(f"Saved model to {model_filename}")
+        self.logger.info(f"Saved model to {model_filename}")
         return model_filename
 
     def _create_model_metadata(
@@ -287,7 +300,7 @@ class TrainingPipeline:
         validation_results: Optional[Dict]
     ) -> Dict[str, Any]:
         """Create model metadata for registration."""
-        logger.info("Creating model metadata...")
+        self.logger.info("Creating model metadata...")
 
         metadata = create_model_metadata(
             strategy_name=self.config.strategy_name,
@@ -355,12 +368,12 @@ class TrainingPipeline:
         with open(results_file, 'w') as f:
             json.dump(output, f, indent=2, default=str)
 
-        logger.info(f"Results saved to: {results_file}")
+        self.logger.info(f"Results saved to: {results_file}")
 
     def _cleanup_temporary_model(self, model_filename: str) -> None:
         """Clean up temporary model file."""
         try:
             Path(model_filename).unlink()
-            logger.debug(f"Cleaned up temporary model file: {model_filename}")
+            self.logger.debug(f"Cleaned up temporary model file: {model_filename}")
         except FileNotFoundError:
             pass  # Already cleaned up

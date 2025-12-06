@@ -165,3 +165,10 @@ def create_3class_target(
     target[future_returns < -threshold_pct / 100] = 0  # Short (0)
 
     return target
+
+
+def validate_target_type_supported(target_type: str):
+    """Explicitly guard unsupported target types."""
+    supported = {"classification", "classification_2class", "classification_3class", "binary", "3class", "", None}
+    if target_type not in supported:
+        raise ValueError(f"Unsupported target type '{target_type}'. Regression targets are not supported.")

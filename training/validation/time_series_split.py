@@ -123,6 +123,8 @@ class TimeSeriesSplitter:
         self,
         df: pd.DataFrame,
         timestamp_column: str = "timestamp",
+        persist_path: str = None,
+        load_existing: bool = False,
     ) -> List[TimeSeriesSplit]:
         """
         Generate train/validation splits.
@@ -137,6 +139,22 @@ class TimeSeriesSplitter:
         Raises:
             ValueError: If data is insufficient or splits are invalid
         """
+        if load_existing and persist_path:
+            persisted = Path(persist_path)
+            if persisted.exists():
+                import json
+                data = json.loads(persisted.read_text())
+                return [
+                    TimeSeriesSplit(
+                        train_start=pd.to_datetime(s["train_start"]),
+                        train_end=pd.to_datetime(s["train_end"]),
+                        val_start=pd.to_datetime(s["val_start"]),
+                        val_end=pd.to_datetime(s["val_end"]),
+                        split_index=s["split_index"],
+                    )
+                    for s in data
+                ]
+
         if len(df) < self.min_train_size:
             raise ValueError(
                 f"Insufficient data: {len(df)} rows < {self.min_train_size} minimum"
@@ -212,6 +230,21 @@ class TimeSeriesSplitter:
 
         if len(splits) == 0:
             raise ValueError("Could not generate any valid splits")
+
+        if persist_path:
+            import json
+            payload = [
+                {
+                    "train_start": str(s.train_start),
+                    "train_end": str(s.train_end),
+                    "val_start": str(s.val_start),
+                    "val_end": str(s.val_end),
+                    "split_index": s.split_index,
+                }
+                for s in splits
+            ]
+            Path(persist_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(persist_path).write_text(json.dumps(payload, indent=2))
 
         logger.info(f"Generated {len(splits)} valid splits")
         return splits
