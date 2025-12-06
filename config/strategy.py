@@ -74,6 +74,7 @@ class ValidationSection(BaseConfig):
 
     method: str = Field(default="walk_forward", description="Validation method (walk_forward, single_split)")
     n_splits: int = Field(default=4, description="Number of walk-forward splits", ge=2)
+    test_size: float | None = Field(default=None, description="Validation size fraction (0-1); if None, defaults to splitter logic")
     expanding_window: bool = Field(default=True, description="Use expanding window (vs sliding)")
     gap_bars: int = Field(default=0, description="Gap bars between train/val splits", ge=0)
 

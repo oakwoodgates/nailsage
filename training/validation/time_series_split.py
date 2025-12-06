@@ -10,6 +10,7 @@ from typing import List, Tuple
 
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import TimeSeriesSplit as SklearnTimeSeriesSplit
 
 from utils.logger import get_validation_logger
 
@@ -90,8 +91,9 @@ class TimeSeriesSplitter:
         n_splits: int = 5,
         test_size: float = 0.2,
         gap_bars: int = 0,
-        expanding_window: bool = True,
         min_train_size: int = 1000,
+        min_val_size: int = 500,
+        expanding_window: bool = True,  # kept for backward compatibility
     ):
         """
         Initialize TimeSeriesSplitter.
@@ -106,8 +108,9 @@ class TimeSeriesSplitter:
         self.n_splits = n_splits
         self.test_size = test_size
         self.gap_bars = gap_bars
-        self.expanding_window = expanding_window
         self.min_train_size = min_train_size
+        self.min_val_size = min_val_size
+        self.expanding_window = expanding_window
 
         logger.info(
             "Initialized TimeSeriesSplitter",
@@ -115,6 +118,7 @@ class TimeSeriesSplitter:
                 "n_splits": n_splits,
                 "test_size": test_size,
                 "gap_bars": gap_bars,
+                "min_val_size": min_val_size,
                 "expanding_window": expanding_window,
             },
         )
@@ -125,6 +129,7 @@ class TimeSeriesSplitter:
         timestamp_column: str = "timestamp",
         persist_path: str = None,
         load_existing: bool = False,
+        min_val_size: int = 500,
     ) -> List[TimeSeriesSplit]:
         """
         Generate train/validation splits.
@@ -165,43 +170,32 @@ class TimeSeriesSplitter:
 
         n_samples = len(df)
         val_size = int(n_samples * self.test_size)
+        val_size = max(val_size, min_val_size)
 
         if val_size < 10:
             raise ValueError(f"Validation size too small: {val_size} samples")
 
+        sklearn_splitter = SklearnTimeSeriesSplit(
+            n_splits=self.n_splits,
+            test_size=val_size,
+        )
+
         splits = []
+        for i, (train_idx, val_idx) in enumerate(sklearn_splitter.split(df)):
+            # Apply gap by truncating tail of train
+            if self.gap_bars > 0:
+                if len(train_idx) <= self.gap_bars:
+                    continue
+                train_idx = train_idx[:-self.gap_bars]
 
-        # Calculate split points
-        for i in range(self.n_splits):
-            if self.expanding_window:
-                # Expanding window: training size grows
-                train_end_idx = int(n_samples * (1 - self.test_size * (self.n_splits - i) / self.n_splits))
-            else:
-                # Rolling window: training size stays constant
-                train_size = n_samples - val_size * (self.n_splits - i)
-                train_end_idx = train_size
-
-            # Ensure minimum training size
-            if train_end_idx < self.min_train_size:
+            if len(train_idx) < self.min_train_size:
                 continue
 
-            # Add gap
-            val_start_idx = train_end_idx + self.gap_bars
+            train_start = df.iloc[train_idx[0]][timestamp_column]
+            train_end = df.iloc[train_idx[-1]][timestamp_column]
+            val_start = df.iloc[val_idx[0]][timestamp_column]
+            val_end = df.iloc[val_idx[-1]][timestamp_column]
 
-            # Validation end
-            val_end_idx = val_start_idx + val_size
-
-            # Check we have enough data
-            if val_end_idx > n_samples:
-                break
-
-            # Get timestamps
-            train_start = df.iloc[0][timestamp_column]
-            train_end = df.iloc[train_end_idx - 1][timestamp_column]
-            val_start = df.iloc[val_start_idx][timestamp_column]
-            val_end = df.iloc[val_end_idx - 1][timestamp_column]
-
-            # Create split
             split = TimeSeriesSplit(
                 train_start=train_start,
                 train_end=train_end,
@@ -210,20 +204,14 @@ class TimeSeriesSplitter:
                 split_index=i,
             )
 
-            # Validate split
-            try:
-                split.validate()
-            except ValueError as e:
-                logger.error(f"Invalid split {i}: {e}")
-                raise
-
+            split.validate()
             splits.append(split)
 
             logger.info(
                 f"Created split {i}",
                 extra_data={
-                    "train_samples": train_end_idx,
-                    "val_samples": val_size,
+                    "train_samples": len(train_idx),
+                    "val_samples": len(val_idx),
                     "gap_bars": self.gap_bars,
                 },
             )
@@ -231,7 +219,7 @@ class TimeSeriesSplitter:
         if len(splits) == 0:
             raise ValueError("Could not generate any valid splits")
 
-        if persist_path:
+        if persist_path and splits:
             import json
             payload = [
                 {

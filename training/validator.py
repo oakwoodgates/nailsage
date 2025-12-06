@@ -55,12 +55,14 @@ class Validator:
             n_splits = getattr(validation_config, 'n_splits', 4)
             expanding_window = getattr(validation_config, 'expanding_window', True)
             gap_bars = getattr(validation_config, 'gap_bars', 4)
+            test_size = getattr(validation_config, 'test_size', 0.2)
 
         # Create time series splitter
         self.splitter = TimeSeriesSplitter(
             n_splits=n_splits,
-            expanding_window=expanding_window,
+            test_size=test_size,
             gap_bars=gap_bars,
+            expanding_window=expanding_window,
         )
 
         # Create backtest configuration
