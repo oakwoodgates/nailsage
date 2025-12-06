@@ -1,6 +1,7 @@
 """Validation orchestration for training pipelines."""
 
 import logging
+import time
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -109,6 +110,7 @@ class Validator:
         logger.info("RUNNING WALK-FORWARD VALIDATION")
         logger.info("="*70)
         set_random_seeds()
+        t_start = time.perf_counter()
 
         # Generate splits
         splits = self.splitter.split(df_clean, timestamp_column='timestamp')
@@ -137,6 +139,8 @@ class Validator:
 
         # Log aggregate results
         self._log_aggregate_results(aggregate_results)
+        t_end = time.perf_counter()
+        logger.info(f"Validation runtime: {t_end - t_start:.2f}s")
 
         return validation_results
 
@@ -198,6 +202,9 @@ class Validator:
             },
             'val_metrics': {
                 'accuracy': val_acc,
+                'precision': float(self._safe_metric(probabilities, y_split_val, metric="precision")),
+                'recall': float(self._safe_metric(probabilities, y_split_val, metric="recall")),
+                'f1': float(self._safe_metric(probabilities, y_split_val, metric="f1")),
             },
             'backtest_metrics': {
                 'total_return': float(backtest_metrics.total_return),
@@ -242,6 +249,9 @@ class Validator:
 
         # Extract metrics
         val_accuracies = [r['val_metrics']['accuracy'] for r in split_results]
+        precisions = [r['val_metrics']['precision'] for r in split_results]
+        recalls = [r['val_metrics']['recall'] for r in split_results]
+        f1s = [r['val_metrics']['f1'] for r in split_results]
         total_returns = [r['backtest_metrics']['total_return'] for r in split_results]
         sharpe_ratios = [r['backtest_metrics']['sharpe_ratio'] for r in split_results]
         max_drawdowns = [r['backtest_metrics']['max_drawdown'] for r in split_results]
@@ -260,6 +270,9 @@ class Validator:
 
         return {
             'avg_val_accuracy': avg_val_acc,
+            'avg_precision': float(np.mean(precisions)),
+            'avg_recall': float(np.mean(recalls)),
+            'avg_f1': float(np.mean(f1s)),
             'avg_total_return': avg_return,
             'avg_sharpe_ratio': avg_sharpe,
             'avg_max_drawdown': avg_max_dd,
@@ -277,6 +290,9 @@ class Validator:
         logger.info(f"{'='*70}")
 
         logger.info(f"Average Validation Accuracy: {aggregate['avg_val_accuracy']:.4f}")
+        logger.info(f"Average Precision: {aggregate['avg_precision']:.4f}")
+        logger.info(f"Average Recall: {aggregate['avg_recall']:.4f}")
+        logger.info(f"Average F1: {aggregate['avg_f1']:.4f}")
         logger.info(f"Average Total Return: {aggregate['avg_total_return'] * 100:.2f}%")
         logger.info(f"Average Sharpe Ratio: {aggregate['avg_sharpe_ratio']:.2f}")
         logger.info(f"Average Max Drawdown: {aggregate['avg_max_drawdown'] * 100:.2f}%")
@@ -319,6 +335,28 @@ class Validator:
 
         logger.info(f"Using class weights: {class_weights}")
         return sample_weights
+
+    def _safe_metric(self, probabilities, y_true, metric: str):
+        """Compute simple precision/recall/f1 for binary/3-class using argmax predictions."""
+        from sklearn.metrics import precision_score, recall_score, f1_score
+
+        if probabilities is None:
+            return 0.0
+
+        y_pred = probabilities.argmax(axis=1)
+        average = "binary" if len(set(y_true)) <= 2 else "macro"
+
+        try:
+            if metric == "precision":
+                return precision_score(y_true, y_pred, average=average, zero_division=0)
+            if metric == "recall":
+                return recall_score(y_true, y_pred, average=average, zero_division=0)
+            if metric == "f1":
+                return f1_score(y_true, y_pred, average=average, zero_division=0)
+        except Exception:
+            return 0.0
+
+        return 0.0
 
     def _resolve_num_classes(self) -> int:
         """Determine number of classes from target configuration."""

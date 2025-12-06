@@ -65,6 +65,7 @@ class DataPipeline:
         feature_engine = FeatureEngine(self.config.features)
         df_features = self._compute_features(df, feature_engine)
         self._validate_feature_schema(df_features)
+        self._validate_numeric_finite(df_features)
 
         # Align features and targets
         df_clean, target_clean = self._align_features_and_targets(
@@ -126,6 +127,11 @@ class DataPipeline:
         missing = [c for c in self.ohlcv_columns if c not in df.columns]
         if missing:
             raise ValueError(f"Missing required OHLCV columns: {missing}")
+        # Ensure timestamp is tz-naive
+        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+            raise ValueError("timestamp column must be datetime-like")
+        if df['timestamp'].dt.tz is not None:
+            raise ValueError("timestamp column must be timezone-naive")
 
     def _validate_feature_schema(self, df_features: pd.DataFrame) -> None:
         """Ensure timestamp is present and no duplicate columns."""
@@ -133,6 +139,15 @@ class DataPipeline:
             raise ValueError("Feature DataFrame must contain 'timestamp' column.")
         if df_features.columns.duplicated().any():
             raise ValueError("Feature DataFrame contains duplicate column names.")
+
+    def _validate_numeric_finite(self, df_features: pd.DataFrame) -> None:
+        """Ensure numeric feature columns are finite (no inf/nan after dropna)."""
+        numeric_cols = [c for c in df_features.columns if c not in self.ohlcv_columns and pd.api.types.is_numeric_dtype(df_features[c])]
+        if not numeric_cols:
+            return
+        bad_mask = ~np.isfinite(df_features[numeric_cols]).all(axis=1)
+        if bad_mask.any():
+            raise ValueError(f"Non-finite values detected in feature columns: {bad_mask.sum()} rows")
 
     def _create_target_variable(self, df: pd.DataFrame) -> pd.Series:
         """Create target variable based on configured target type."""
@@ -193,6 +208,7 @@ class DataPipeline:
             "resample_interval": self.config.resample_interval,
             "feature_config": getattr(self.config.features, "model_dump", lambda: self.config.features)(),
             "row_count": len(df),
+            "source_checksum": self._source_checksum(),
         }
         serialized = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -210,6 +226,15 @@ class DataPipeline:
         cache_path = self.cache_dir / f"{cache_key}.parquet"
         df_features.to_parquet(cache_path)
         logger.info(f"Wrote feature cache: {cache_path}")
+
+    def _source_checksum(self) -> str:
+        """Compute checksum of source file using size and mtime for invalidation."""
+        data_path = Path("data/raw") / self.config.data_source
+        if not data_path.exists():
+            return "missing"
+        stat = data_path.stat()
+        payload = f"{stat.st_size}-{int(stat.st_mtime)}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _align_features_and_targets(
         self,

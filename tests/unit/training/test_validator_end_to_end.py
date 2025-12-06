@@ -39,6 +39,7 @@ def test_validator_walk_forward_trains_per_split(monkeypatch):
     cfg = _make_dummy_config()
     validator = Validator(cfg)
     validator.splitter.min_train_size = 50
+    validator.splitter.test_size = 0.1
 
     # Patch model factory to deterministic dummy classifier
     monkeypatch.setattr(validator, "_create_model", lambda: DummyClassifier(strategy="most_frequent"))

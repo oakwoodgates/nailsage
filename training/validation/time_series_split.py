@@ -271,6 +271,9 @@ class TimeSeriesSplitter:
         Raises:
             ValueError: If lookback validation fails
         """
+        if lookback_bars <= 0:
+            return True
+
         timestamps = df[timestamp_column]
 
         # Find index of first validation bar

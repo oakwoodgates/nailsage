@@ -22,16 +22,33 @@ def main():
     parser.add_argument("--config", required=True, help="Path to strategy YAML config.")
     parser.add_argument("--train-only", action="store_true", help="Skip validation.")
     parser.add_argument("--no-save", action="store_true", help="Skip saving results to disk.")
+    parser.add_argument("--summary", action="store_true", help="Print concise summary only.")
+    parser.add_argument("--dry-run", action="store_true", help="Load config, validate schemas, then exit.")
     args = parser.parse_args()
 
     logger = get_training_logger()
     cfg = StrategyConfig.from_yaml(args.config)
+
+    if args.dry_run:
+        logger.info("Dry run completed: config loaded and validated.")
+        return 0
 
     pipeline = TrainingPipeline(cfg)
     result = pipeline.run(train_only=args.train_only, save_results=not args.no_save)
 
     logger.info(f"Completed. Model ID: {result.model_id}")
     logger.info(f"Artifact: {result.model_artifact_path}")
+    if args.summary:
+        train_acc = result.training_metrics.get("train_accuracy")
+        val = result.validation_results
+        val_acc = val["aggregate"]["avg_val_accuracy"] if val else None
+        logger.info(
+            "Summary",
+            extra={
+                "train_accuracy": train_acc,
+                "avg_val_accuracy": val_acc,
+            },
+        )
     return 0
 
 
