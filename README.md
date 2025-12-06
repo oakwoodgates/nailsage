@@ -75,6 +75,9 @@ pytest tests/unit/ -v
 
 # Run with coverage
 pytest tests/unit/ --cov=. --cov-report=term-missing
+
+# Optional end-to-end training pipeline test (requires RUN_E2E_TRAINING=1)
+RUN_E2E_TRAINING=1 pytest tests/integration/training/test_e2e_training_pipeline.py -q
 ```
 
 ### 🐳 Docker Quick Start (Recommended for Paper Trading)
