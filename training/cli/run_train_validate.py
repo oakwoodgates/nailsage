@@ -30,7 +30,7 @@ def main():
     logger = get_training_logger()
     cfg = StrategyConfig.from_yaml(args.config)
     if args.force_cache_bust:
-        cfg.feature_cache_enabled = False
+        cfg.features.enable_cache = False
 
     if args.dry_run:
         logger.info("Dry run completed: config loaded and validated.")
