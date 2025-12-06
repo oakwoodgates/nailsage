@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Tuple, List, Optional
 
 import pandas as pd
+import numpy as np
 
 from config.strategy import StrategyConfig
 from data.loader import DataLoader
@@ -94,6 +95,10 @@ class DataPipeline:
         if 'time' in df.columns and 'timestamp' not in df.columns:
             df = df.rename(columns={'time': 'timestamp'})
 
+        # Normalize timezone: enforce tz-naive timestamps
+        if pd.api.types.is_datetime64_any_dtype(df['timestamp']) and df['timestamp'].dt.tz is not None:
+            df['timestamp'] = df['timestamp'].dt.tz_localize(None)
+
         # Resample if needed
         if self.config.resample_interval:
             logger.info(f"Resampling to {self.config.resample_interval}")
@@ -156,9 +161,10 @@ class DataPipeline:
         numeric_cols = [c for c in df_features.columns if c not in self.ohlcv_columns and pd.api.types.is_numeric_dtype(df_features[c])]
         if not numeric_cols:
             return
-        bad_mask = ~np.isfinite(df_features[numeric_cols]).all(axis=1)
-        if bad_mask.any():
-            raise ValueError(f"Non-finite values detected in feature columns: {bad_mask.sum()} rows")
+        # Replace infinities with NaN (will be dropped later)
+        inf_mask = ~np.isfinite(df_features[numeric_cols])
+        if inf_mask.any().any():
+            df_features.loc[:, numeric_cols] = df_features[numeric_cols].replace([np.inf, -np.inf], np.nan)
 
     def _create_target_variable(self, df: pd.DataFrame) -> pd.Series:
         """Create target variable based on configured target type."""

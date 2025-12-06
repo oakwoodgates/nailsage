@@ -67,7 +67,8 @@ def validate_config_consistency(config) -> None:
     if hasattr(config, 'backtest'):
         backtest_config = config.backtest
         if hasattr(backtest_config, 'leverage') and backtest_config.leverage > 1:
-            if not hasattr(backtest_config, 'enable_leverage') or not backtest_config.enable_leverage:
+            # Only enforce enable_leverage when the flag exists; StrategyConfig backtest section does not have it.
+            if hasattr(backtest_config, 'enable_leverage') and not backtest_config.enable_leverage:
                 raise ValueError("enable_leverage must be True when leverage > 1")
 
     # Check model config
