@@ -222,6 +222,8 @@ class MultiStrategyEngine:
             model_id=model_metadata.model_id,
             registry=self.model_registry,
             feature_engine=feature_engine,
+            strategy_name=strategy_id,
+            strategy_version=version,
         )
         await predictor.load_model()
 
@@ -235,6 +237,7 @@ class MultiStrategyEngine:
             position_size_pct=float(os.getenv(f'{strategy_id.upper()}_POSITION_SIZE_PCT', '10.0')),
             cooldown_bars=int(os.getenv(f'{strategy_id.upper()}_COOLDOWN_BARS', '4')),
             allow_neutral_signals=True,
+            version=version,
         )
         signal_generator = SignalGenerator(signal_gen_config)
 

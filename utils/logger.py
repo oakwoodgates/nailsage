@@ -193,11 +193,11 @@ def setup_logger(
     # Clear existing handlers
     logger.handlers.clear()
 
-    # Choose formatter
+    # Choose formatter (force plain text; no colors)
     if json_format:
         formatter = JSONFormatter()
     else:
-        formatter = HumanReadableFormatter()
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
     # Console handler (stdout)
     console_handler = logging.StreamHandler(sys.stdout)
@@ -281,7 +281,7 @@ def get_validation_logger(name: str = "nailsage") -> CategoryAdapter:
     return get_logger(CATEGORY_VALIDATION, name)
 
 
-def get_context_logger(base_extra: Optional[Dict[str, Any]] = None, json_format: bool = True, name: str = "nailsage") -> logging.Logger:
+def get_context_logger(base_extra: Optional[Dict[str, Any]] = None, json_format: bool = False, name: str = "nailsage") -> logging.Logger:
     """
     Get a logger with base context merged into every record.
 

@@ -67,6 +67,7 @@ class SignalGeneratorConfig:
         position_size_pct: Position size as percentage of current bankroll (0-100)
         cooldown_bars: Minimum bars between signals (prevents spam)
         allow_neutral_signals: If True, emit neutral signals (close positions)
+        version: Strategy version for logging
     """
 
     strategy_name: str
@@ -75,6 +76,7 @@ class SignalGeneratorConfig:
     position_size_pct: float = 10.0  # 10% of bankroll per trade
     cooldown_bars: int = 4
     allow_neutral_signals: bool = True
+    version: str = "unknown"
 
     def __post_init__(self):
         """Validate config."""
@@ -126,8 +128,11 @@ class SignalGenerator:
         self._last_signal_timestamp: Optional[int] = None  # Unix ms
         self._signals_generated: int = 0
 
+        self.strategy_name = config.strategy_name
+        self.strategy_version = getattr(config, "version", "unknown")
+
         logger.info(
-            f"Initialized SignalGenerator for {config.strategy_name}",
+            f"[{self.strategy_name} v{self.strategy_version}] Initialized SignalGenerator",
             extra={
                 "asset": config.asset,
                 "confidence_threshold": config.confidence_threshold,
@@ -216,7 +221,9 @@ class SignalGenerator:
 
         # Check if neutral signals are allowed (if we disabled them above)
         if not neutral_allowed and signal_direction == 0:
-            logger.info("Signal suppressed: Neutral signal not allowed")
+            logger.info(
+                f"[{self.strategy_name} v{self.strategy_version}] Signal suppressed: Neutral signal not allowed"
+            )
             return None
 
         # Check deduplication (same signal as last)
@@ -227,6 +234,7 @@ class SignalGenerator:
         if is_duplicate and not is_closing_signal:
             signal_name = {-1: "SHORT", 0: "NEUTRAL", 1: "LONG"}[signal_direction]
             logger.info(
+                f"[{self.strategy_name} v{self.strategy_version}] "
                 f"Signal suppressed: {signal_name} is duplicate of last signal"
             )
             return None
@@ -234,6 +242,7 @@ class SignalGenerator:
         # Log if we're emitting a duplicate NEUTRAL to close positions
         if is_duplicate and is_closing_signal:
             logger.info(
+                f"[{self.strategy_name} v{self.strategy_version}] "
                 f"Emitting duplicate NEUTRAL signal to close {has_open_positions} open position(s)"
             )
 
@@ -272,6 +281,7 @@ class SignalGenerator:
         self._signals_generated += 1
 
         logger.info(
+            f"[{self.strategy_name} v{self.strategy_version}] "
             f"Generated signal #{self._signals_generated}: "
             f"{signal.direction_name.upper()} "
             f"(confidence: {signal.confidence:.2%}, size: ${position_size_usd:.2f})",

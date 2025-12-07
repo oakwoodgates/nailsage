@@ -37,6 +37,7 @@ from features.engine import FeatureEngine
 from models.registry import ModelRegistry
 from models.metadata import ModelMetadata
 from models.feature_schema import FeatureSchema
+from utils.logger import get_context_logger
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,8 @@ class ModelPredictor:
         model_id: str,
         registry: ModelRegistry,
         feature_engine: FeatureEngine,
+        strategy_name: Optional[str] = None,
+        strategy_version: Optional[str] = None,
     ):
         """
         Initialize predictor.
@@ -135,7 +138,20 @@ class ModelPredictor:
         self._prediction_cache: Dict[int, Prediction] = {}
         self._max_cache_size = 1000
 
-        logger.info(f"Initialized ModelPredictor for model {model_id}")
+        self.strategy_name = strategy_name or "unknown_strategy"
+        self.strategy_version = strategy_version or "unknown_version"
+
+        self.logger = get_context_logger(
+            base_extra={
+                "model_id": model_id,
+                "strategy": self.strategy_name,
+                "version": self.strategy_version,
+            },
+            json_format=False,
+            name=__name__,
+        )
+
+        logger.info("Initialized ModelPredictor for model {model_id}")
 
     async def load_model(self) -> None:
         """
@@ -148,7 +164,10 @@ class ModelPredictor:
             ValueError: If model not found in registry
             FileNotFoundError: If model artifact file not found
         """
-        logger.info(f"Loading model {self.model_id} from registry...")
+        logger.info(
+            f"[{self.strategy_name} v{self.strategy_version}] "
+            f"Loading model {self.model_id} from registry..."
+        )
 
         # Load metadata from registry (I/O operation, run in thread)
         self.metadata = await asyncio.to_thread(
@@ -168,7 +187,10 @@ class ModelPredictor:
             )
 
         # Load model artifact (I/O operation, run in thread)
-        logger.info(f"Loading model artifact from {artifact_path}")
+        logger.info(
+            f"[{self.strategy_name} v{self.strategy_version}] "
+            f"Loading model artifact from {artifact_path}"
+        )
         self.model = await asyncio.to_thread(
             joblib.load,
             artifact_path
@@ -178,6 +200,7 @@ class ModelPredictor:
         if self.metadata.feature_schema:
             self.feature_schema = FeatureSchema.from_dict(self.metadata.feature_schema)
             logger.info(
+                f"[{self.strategy_name} v{self.strategy_version}] "
                 f"Loaded feature schema: {len(self.feature_schema.feature_names)} features, "
                 f"include_ohlcv={self.feature_schema.include_ohlcv}"
             )
@@ -188,6 +211,7 @@ class ModelPredictor:
             )
 
         logger.info(
+            f"[{self.strategy_name} v{self.strategy_version}] "
             f"Model {self.model_id} loaded successfully",
             extra={
                 "model_type": self.metadata.model_type,
@@ -331,8 +355,15 @@ class ModelPredictor:
         self._last_prediction = prediction
 
         logger.info(
+            f"[{self.logger.extra.get('strategy')} v{self.logger.extra.get('version')}] "
             f"Prediction: {prediction.get_signal()} "
-            f"(confidence: {confidence:.2%})"
+            f"(confidence: {confidence:.2%})",
+            extra={
+                "model_id": self.model_id,
+                "signal": prediction.get_signal(),
+                "confidence": confidence,
+                "probabilities": probs_dict,
+            },
         )
 
         return prediction
