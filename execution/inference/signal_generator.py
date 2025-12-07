@@ -37,17 +37,21 @@ Example usage:
 
     # Convert prediction to signal (with current bankroll)
     # Mode is auto-detected from prediction.probabilities
-    signal = generator.generate_signal(prediction, current_bankroll=9500.0)
+    # Returns (signal, rejection_reason) tuple
+    signal, rejection_reason = generator.generate_signal(prediction, current_bankroll=9500.0)
 
     if signal:
         # Signal was generated (confidence threshold met, not duplicate)
         coordinator.process_signal(signal)
+    else:
+        # Signal was filtered - rejection_reason explains why
+        print(f"Signal rejected: {rejection_reason}")
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
 from execution.inference.predictor import Prediction
 from execution.portfolio.signal import StrategySignal
@@ -167,7 +171,7 @@ class SignalGenerator:
         candle_interval_ms: int = 900000,  # 15 minutes default
         has_open_positions: bool = False,
         current_bankroll: float = 10000.0,
-    ) -> Optional[StrategySignal]:
+    ) -> Tuple[Optional[StrategySignal], Optional[str]]:
         """
         Generate a trading signal from a prediction.
 
@@ -178,7 +182,15 @@ class SignalGenerator:
             current_bankroll: Current strategy bankroll in USD (for position sizing)
 
         Returns:
-            StrategySignal if conditions met, None otherwise
+            Tuple of (signal, rejection_reason):
+            - If signal generated: (StrategySignal, None)
+            - If rejected: (None, rejection_reason_string)
+
+        Rejection reasons:
+            - "confidence_below_threshold": Model confidence < configured threshold
+            - "neutral_not_allowed": Neutral signal when config disables them
+            - "duplicate_signal": Same signal as previous (deduplication)
+            - "cooldown_active": Within cooldown period between signals
 
         Conditions for generating signal:
         1. Confidence meets threshold
@@ -206,7 +218,7 @@ class SignalGenerator:
         num_classes = self._detect_num_classes(prediction)
         max_confidence = float(np.max(probabilities_array))
         if max_confidence < self.config.confidence_threshold:
-            return None
+            return None, "confidence_below_threshold"
 
         if num_classes == 5:
             signals = self._convert_5class_predictions(predictions_array)
@@ -224,7 +236,7 @@ class SignalGenerator:
             logger.info(
                 f"[{self.strategy_name} v{self.strategy_version}] Signal suppressed: Neutral signal not allowed"
             )
-            return None
+            return None, "neutral_not_allowed"
 
         # Check deduplication (same signal as last)
         # EXCEPTION: If we have open positions and signal is NEUTRAL, we MUST emit it to close positions
@@ -237,7 +249,7 @@ class SignalGenerator:
                 f"[{self.strategy_name} v{self.strategy_version}] "
                 f"Signal suppressed: {signal_name} is duplicate of last signal"
             )
-            return None
+            return None, "duplicate_signal"
 
         # Log if we're emitting a duplicate NEUTRAL to close positions
         if is_duplicate and is_closing_signal:
@@ -256,7 +268,7 @@ class SignalGenerator:
                 f"Signal suppressed: Cooldown period "
                 f"({bars_since_last}/{self.config.cooldown_bars} bars elapsed)"
             )
-            return None
+            return None, "cooldown_active"
 
         # Restore original threshold if we modified it
         if not neutral_allowed:
@@ -294,7 +306,7 @@ class SignalGenerator:
             }
         )
 
-        return signal
+        return signal, None
 
 
     def _is_cooldown_elapsed(
