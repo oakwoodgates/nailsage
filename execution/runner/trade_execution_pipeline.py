@@ -249,9 +249,18 @@ class TradeExecutionPipeline:
             signal: StrategySignal if generated
             prediction: Model prediction
         """
-        # Map prediction to signal type string
+        # Map signal direction to signal type string
+        # Use signal.signal when available (already converted to -1, 0, 1)
         signal_map = {-1: 'short', 0: 'neutral', 1: 'long'}
-        signal_type = signal_map.get(prediction.prediction, 'neutral')
+        if signal is not None:
+            signal_type = signal_map[signal.signal]
+        else:
+            # Fallback when signal was filtered - derive from prediction
+            is_binary = prediction.probabilities.get('neutral', 0.0) == 0.0
+            if is_binary:
+                signal_type = 'short' if prediction.prediction == 0 else 'long'
+            else:
+                signal_type = {0: 'short', 1: 'neutral', 2: 'long'}[prediction.prediction]
 
         signal_record = SignalRecord(
             id=None,
