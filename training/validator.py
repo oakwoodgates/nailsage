@@ -56,6 +56,8 @@ class Validator:
             expanding_window = getattr(validation_config, 'expanding_window', True)
             gap_bars = getattr(validation_config, 'gap_bars', 4)
             test_size = getattr(validation_config, 'test_size', 0.2)
+            if test_size is None:
+                test_size = 0.2
 
         # Create time series splitter
         self.splitter = TimeSeriesSplitter(

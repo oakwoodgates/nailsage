@@ -106,7 +106,7 @@ class TimeSeriesSplitter:
             min_train_size: Minimum number of training samples required
         """
         self.n_splits = n_splits
-        self.test_size = test_size
+        self.test_size = 0.2 if test_size is None else test_size
         self.gap_bars = gap_bars
         self.min_train_size = min_train_size
         self.min_val_size = min_val_size
