@@ -263,27 +263,43 @@ class MultiStrategyEngine:
                 logger.info(f"    Using existing DB record (ID: {db_strategy_id})")
                 break
 
+        # Get arena info for interval configuration
+        arena = self.state_manager.get_arena_by_starlisting_id(starlisting_id)
+        if arena:
+            arena_interval = arena.get('interval', '15m')
+            arena_interval_seconds = arena.get('interval_seconds', 900)
+            arena_id = arena.get('id')
+            logger.info(f"    Arena: {arena.get('trading_pair')} @ {arena_interval} (ID: {arena_id})")
+        else:
+            # Fallback if arena not synced yet
+            arena_interval = os.getenv(f'{strategy_id.upper()}_INTERVAL', '15m')
+            arena_interval_seconds = 900  # Default 15 minutes
+            arena_id = None
+            logger.warning(f"    Arena not found for starlisting {starlisting_id}, using default interval {arena_interval}")
+
         if db_strategy_id is None:
             strategy_record = Strategy(
                 id=None,
                 strategy_name=strategy_id,
                 version=version,
                 starlisting_id=starlisting_id,
-                interval=os.getenv(f'{strategy_id.upper()}_INTERVAL', '15m'),
+                interval=arena_interval,
                 model_id=model_metadata.model_id,
                 config_path=None,
                 is_active=True,
+                arena_id=arena_id,
             )
             db_strategy_id = self.state_manager.save_strategy(strategy_record)
             logger.info(f"    Created DB record (ID: {db_strategy_id})")
 
         # Create live strategy
+        candle_interval_ms = arena_interval_seconds * 1000
         strategy_config = LiveStrategyConfig(
             strategy_id=db_strategy_id,
             strategy_name=strategy_id,
             starlisting_id=starlisting_id,
             asset=f"{symbol}/USDT",
-            candle_interval_ms=900000,  # 15 minutes (TODO: make configurable)
+            candle_interval_ms=candle_interval_ms,
             max_lookback=500,
             enable_trading=True,
         )

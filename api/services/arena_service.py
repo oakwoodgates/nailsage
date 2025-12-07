@@ -538,6 +538,24 @@ class ArenaService:
                 was_created = True
                 logger.info(f"Created arena {arena_id} from Kirby starlisting {starlisting_id}")
 
+            # Update strategies with this starlisting_id to set arena_id and interval
+            interval = data.get("interval", "")
+            updated_count = conn.execute(
+                text("""
+                    UPDATE strategies
+                    SET arena_id = :arena_id, interval = :interval, updated_at = :now
+                    WHERE starlisting_id = :starlisting_id AND (arena_id IS NULL OR arena_id != :arena_id OR interval != :interval)
+                """),
+                {
+                    "arena_id": arena_id,
+                    "interval": interval,
+                    "starlisting_id": starlisting_id,
+                    "now": now,
+                },
+            ).rowcount
+            if updated_count > 0:
+                logger.info(f"Updated {updated_count} strategies with arena_id={arena_id}, interval={interval}")
+
         # Fetch and return the full arena response
         arena = self.get_arena_by_id(arena_id)
         return arena, was_created

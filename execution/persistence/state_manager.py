@@ -45,6 +45,7 @@ class Strategy:
     is_active: bool = True
     initial_bankroll: float = 10000.0  # Starting capital for this strategy (USDT)
     current_bankroll: float = 10000.0  # Current capital after P&L (USDT)
+    arena_id: Optional[int] = None  # FK to arenas table
     created_at: Optional[int] = None
     updated_at: Optional[int] = None
 
@@ -290,9 +291,9 @@ class StateManager:
                 result = conn.execute(
                     text("""
                         INSERT INTO strategies
-                        (strategy_name, version, starlisting_id, interval, model_id, config_path,
+                        (strategy_name, version, starlisting_id, arena_id, interval, model_id, config_path,
                          is_active, initial_bankroll, current_bankroll, created_at, updated_at)
-                        VALUES (:strategy_name, :version, :starlisting_id, :interval, :model_id,
+                        VALUES (:strategy_name, :version, :starlisting_id, :arena_id, :interval, :model_id,
                                 :config_path, :is_active, :initial_bankroll, :current_bankroll,
                                 :created_at, :updated_at)
                         RETURNING id
@@ -301,6 +302,7 @@ class StateManager:
                         "strategy_name": strategy.strategy_name,
                         "version": strategy.version,
                         "starlisting_id": strategy.starlisting_id,
+                        "arena_id": strategy.arena_id,
                         "interval": strategy.interval,
                         "model_id": strategy.model_id,
                         "config_path": strategy.config_path,
@@ -319,7 +321,7 @@ class StateManager:
                     text("""
                         UPDATE strategies
                         SET strategy_name = :strategy_name, version = :version, starlisting_id = :starlisting_id,
-                            interval = :interval, model_id = :model_id, config_path = :config_path,
+                            arena_id = :arena_id, interval = :interval, model_id = :model_id, config_path = :config_path,
                             is_active = :is_active, initial_bankroll = :initial_bankroll,
                             current_bankroll = :current_bankroll, updated_at = :updated_at
                         WHERE id = :id
@@ -328,6 +330,7 @@ class StateManager:
                         "strategy_name": strategy.strategy_name,
                         "version": strategy.version,
                         "starlisting_id": strategy.starlisting_id,
+                        "arena_id": strategy.arena_id,
                         "interval": strategy.interval,
                         "model_id": strategy.model_id,
                         "config_path": strategy.config_path,
@@ -384,6 +387,7 @@ class StateManager:
             is_active=bool(row["is_active"]),
             initial_bankroll=float(row["initial_bankroll"]) if row["initial_bankroll"] is not None else 10000.0,
             current_bankroll=float(row["current_bankroll"]) if row["current_bankroll"] is not None else 10000.0,
+            arena_id=row.get("arena_id"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -414,6 +418,29 @@ class StateManager:
             )
 
         logger.info(f"Updated strategy {strategy_id} bankroll to ${new_bankroll:.2f}")
+
+    def get_arena_by_starlisting_id(self, starlisting_id: int) -> Optional[dict]:
+        """
+        Get arena by starlisting ID.
+
+        Args:
+            starlisting_id: Kirby starlisting ID
+
+        Returns:
+            Dict with arena data or None if not found
+        """
+        engine = self._get_engine()
+
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT * FROM arenas WHERE starlisting_id = :starlisting_id"),
+                {"starlisting_id": starlisting_id}
+            )
+            row = result.mappings().fetchone()
+
+        if row:
+            return dict(row)
+        return None
 
     # ========================================================================
     # Position Methods
