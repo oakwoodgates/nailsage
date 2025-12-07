@@ -83,7 +83,7 @@ services:
 
       # Strategy configuration (comma-separated list)
       # Note: Using hardcoded values due to Windows Docker Desktop .env parsing issues
-      STRATEGY_IDS: dev_scalper_1m_v1,sol_scalper_15m_v1,sol_volatility_regime_adaptive_v1
+      STRATEGY_IDS: dev_scalper_1m_v1,sol_scalper_15m_v1,mean_reversion_v1
 
       # Starlisting IDs (comma-separated)
       STARLISTING_IDS: "1,6,6"
