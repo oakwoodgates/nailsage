@@ -221,7 +221,7 @@ class TestSignalGenerator:
     # Test: Confidence Filtering
     def test_generate_signal_high_confidence(self, generator, prediction_long):
         """Test that high confidence prediction generates signal."""
-        signal = generator.generate_signal(prediction_long, current_bankroll=10000.0)
+        signal, _ = generator.generate_signal(prediction_long, current_bankroll=10000.0)
 
         assert signal is not None
         assert isinstance(signal, StrategySignal)
@@ -235,18 +235,18 @@ class TestSignalGenerator:
     def test_generate_signal_position_size_scales_with_bankroll(self, generator, prediction_long):
         """Test that position size scales with current bankroll."""
         # With $5,000 bankroll, 10% = $500
-        signal_small = generator.generate_signal(prediction_long, current_bankroll=5000.0)
+        signal_small, _ = generator.generate_signal(prediction_long, current_bankroll=5000.0)
         assert signal_small.position_size_usd == 500.0
 
         generator.reset()  # Reset to avoid deduplication
 
         # With $20,000 bankroll, 10% = $2,000
-        signal_large = generator.generate_signal(prediction_long, current_bankroll=20000.0)
+        signal_large, _ = generator.generate_signal(prediction_long, current_bankroll=20000.0)
         assert signal_large.position_size_usd == 2000.0
 
     def test_generate_signal_low_confidence(self, generator, prediction_low_confidence):
         """Test that low confidence prediction is filtered out."""
-        signal = generator.generate_signal(prediction_low_confidence)
+        signal, _ = generator.generate_signal(prediction_low_confidence)
         assert signal is None
 
     def test_generate_signal_exactly_at_threshold(self, generator):
@@ -259,14 +259,14 @@ class TestSignalGenerator:
             confidence=0.6,  # Exactly at threshold
             probabilities={"short": 0.2, "neutral": 0.2, "long": 0.6},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal is not None  # Should pass (>=)
 
     # Test: Signal Deduplication
     def test_deduplication_same_signal(self, generator, prediction_long):
         """Test that duplicate signals are suppressed."""
         # First signal should pass
-        signal1 = generator.generate_signal(prediction_long)
+        signal1, _ = generator.generate_signal(prediction_long)
         assert signal1 is not None
         assert signal1.signal == 1  # Long
 
@@ -279,13 +279,13 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.10, "neutral": 0.10, "long": 0.80},
         )
-        signal2 = generator.generate_signal(prediction_long2, candle_interval_ms=900000)
+        signal2, _ = generator.generate_signal(prediction_long2, candle_interval_ms=900000)
         assert signal2 is None  # Duplicate
 
     def test_deduplication_different_signal(self, generator, prediction_long, prediction_short):
         """Test that different signals are not deduplicated."""
         # First signal: Long
-        signal1 = generator.generate_signal(prediction_long, candle_interval_ms=900000)
+        signal1, _ = generator.generate_signal(prediction_long, candle_interval_ms=900000)
         assert signal1 is not None
         assert signal1.signal == 1
 
@@ -299,7 +299,7 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.80, "neutral": 0.10, "long": 0.10},
         )
-        signal2 = generator.generate_signal(prediction_short_later, candle_interval_ms=900000)
+        signal2, _ = generator.generate_signal(prediction_short_later, candle_interval_ms=900000)
         assert signal2 is not None
         assert signal2.signal == -1  # Short
 
@@ -307,7 +307,7 @@ class TestSignalGenerator:
     def test_cooldown_blocks_signal(self, generator, prediction_long):
         """Test that cooldown period blocks new signals."""
         # First signal
-        signal1 = generator.generate_signal(prediction_long, candle_interval_ms=900000)
+        signal1, _ = generator.generate_signal(prediction_long, candle_interval_ms=900000)
         assert signal1 is not None
 
         # Second signal 2 bars later (within cooldown of 4 bars)
@@ -319,13 +319,13 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.80, "neutral": 0.10, "long": 0.10},
         )
-        signal2 = generator.generate_signal(prediction_2bars, candle_interval_ms=900000)
+        signal2, _ = generator.generate_signal(prediction_2bars, candle_interval_ms=900000)
         assert signal2 is None  # Blocked by cooldown
 
     def test_cooldown_allows_after_period(self, generator, prediction_long):
         """Test that signals are allowed after cooldown period."""
         # First signal
-        signal1 = generator.generate_signal(prediction_long, candle_interval_ms=900000)
+        signal1, _ = generator.generate_signal(prediction_long, candle_interval_ms=900000)
         assert signal1 is not None
 
         # Second signal 4 bars later (exactly at cooldown threshold)
@@ -337,7 +337,7 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.80, "neutral": 0.10, "long": 0.10},
         )
-        signal2 = generator.generate_signal(prediction_4bars, candle_interval_ms=900000)
+        signal2, _ = generator.generate_signal(prediction_4bars, candle_interval_ms=900000)
         assert signal2 is not None  # Should pass (>=)
 
     def test_cooldown_zero_bars(self):
@@ -358,7 +358,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.1, "neutral": 0.15, "long": 0.75},
         )
-        signal1 = generator.generate_signal(prediction1)
+        signal1, _ = generator.generate_signal(prediction1)
         assert signal1 is not None
 
         # Immediate second signal (different direction)
@@ -370,13 +370,13 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.8, "neutral": 0.1, "long": 0.1},
         )
-        signal2 = generator.generate_signal(prediction2)
+        signal2, _ = generator.generate_signal(prediction2)
         assert signal2 is not None  # No cooldown
 
     # Test: Neutral Signal Handling
     def test_neutral_signal_allowed_by_default(self, generator, prediction_neutral):
         """Test that neutral signals are allowed by default."""
-        signal = generator.generate_signal(prediction_neutral)
+        signal, _ = generator.generate_signal(prediction_neutral)
         assert signal is not None
         assert signal.signal == 0  # Neutral
 
@@ -389,7 +389,7 @@ class TestSignalGenerator:
         )
         generator = SignalGenerator(config)
 
-        signal = generator.generate_signal(prediction_neutral)
+        signal, _ = generator.generate_signal(prediction_neutral)
         assert signal is None  # Suppressed
 
     # Test: Prediction to Signal Mapping
@@ -403,7 +403,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.75, "neutral": 0.15, "long": 0.10},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == -1
 
     def test_prediction_to_signal_neutral(self, generator):
@@ -416,7 +416,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.15, "neutral": 0.75, "long": 0.10},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == 0
 
     def test_prediction_to_signal_long(self, generator):
@@ -429,7 +429,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.10, "neutral": 0.15, "long": 0.75},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == 1
 
     # Test: Stats and State Management
@@ -494,12 +494,12 @@ class TestSignalGenerator:
     # Test: Edge Cases
     def test_first_signal_no_deduplication(self, generator, prediction_long):
         """Test first signal is not deduplicated (no previous signal)."""
-        signal = generator.generate_signal(prediction_long)
+        signal, _ = generator.generate_signal(prediction_long)
         assert signal is not None
 
     def test_first_signal_no_cooldown(self, generator, prediction_long):
         """Test first signal is not blocked by cooldown (no previous signal)."""
-        signal = generator.generate_signal(prediction_long)
+        signal, _ = generator.generate_signal(prediction_long)
         assert signal is not None
 
     def test_bars_since_last_signal_no_previous(self, generator):
@@ -540,7 +540,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.1, "neutral": 0.15, "long": 0.75},
         )
-        signal1 = generator.generate_signal(prediction1, candle_interval_ms=14400000)  # 4H
+        signal1, _ = generator.generate_signal(prediction1, candle_interval_ms=14400000)  # 4H
         assert signal1 is not None
 
         # Second signal 3 bars later (should be blocked)
@@ -552,7 +552,7 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.8, "neutral": 0.1, "long": 0.1},
         )
-        signal2 = generator.generate_signal(prediction2, candle_interval_ms=14400000)
+        signal2, _ = generator.generate_signal(prediction2, candle_interval_ms=14400000)
         assert signal2 is None  # Blocked (3 < 4)
 
         # Third signal 4 bars later (should pass)
@@ -564,7 +564,7 @@ class TestSignalGenerator:
             confidence=0.80,
             probabilities={"short": 0.8, "neutral": 0.1, "long": 0.1},
         )
-        signal3 = generator.generate_signal(prediction3, candle_interval_ms=14400000)
+        signal3, _ = generator.generate_signal(prediction3, candle_interval_ms=14400000)
         assert signal3 is not None  # Allowed (4 >= 4)
 
     # ===========================================================================
@@ -579,13 +579,13 @@ class TestSignalGenerator:
 
     def test_binary_long_signal(self, generator, prediction_binary_long):
         """Test binary prediction=1 maps to long signal (+1)."""
-        signal = generator.generate_signal(prediction_binary_long)
+        signal, _ = generator.generate_signal(prediction_binary_long)
         assert signal is not None
         assert signal.signal == 1  # Long
 
     def test_binary_short_signal(self, generator, prediction_binary_short):
         """Test binary prediction=0 maps to short signal (-1)."""
-        signal = generator.generate_signal(prediction_binary_short)
+        signal, _ = generator.generate_signal(prediction_binary_short)
         assert signal is not None
         assert signal.signal == -1  # Short
 
@@ -600,7 +600,7 @@ class TestSignalGenerator:
             confidence=0.70,
             probabilities={"short": 0.70, "neutral": 0.0, "long": 0.30},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal != 0  # Never neutral in binary mode
 
     # Test: 3-class Classification (default)
@@ -619,7 +619,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.75, "neutral": 0.15, "long": 0.10},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == -1
 
     def test_3class_neutral_signal(self, generator):
@@ -632,7 +632,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.10, "neutral": 0.75, "long": 0.15},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == 0
 
     def test_3class_long_signal(self, generator):
@@ -645,7 +645,7 @@ class TestSignalGenerator:
             confidence=0.75,
             probabilities={"short": 0.10, "neutral": 0.15, "long": 0.75},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == 1
 
     # Test: 5-class Classification
@@ -664,18 +664,18 @@ class TestSignalGenerator:
             confidence=0.70,
             probabilities={"strong_short": 0.70, "weak_short": 0.10, "neutral": 0.10, "weak_long": 0.05, "strong_long": 0.05},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == -1
 
     def test_5class_weak_short_signal(self, generator, prediction_5class_weak_short):
         """Test 5-class prediction=1 (weak short) maps to short signal (-1)."""
-        signal = generator.generate_signal(prediction_5class_weak_short)
+        signal, _ = generator.generate_signal(prediction_5class_weak_short)
         assert signal is not None
         assert signal.signal == -1  # Weak short still maps to short
 
     def test_5class_neutral_signal(self, generator, prediction_5class_neutral):
         """Test 5-class prediction=2 (neutral) maps to neutral signal (0)."""
-        signal = generator.generate_signal(prediction_5class_neutral)
+        signal, _ = generator.generate_signal(prediction_5class_neutral)
         assert signal is not None
         assert signal.signal == 0
 
@@ -689,12 +689,12 @@ class TestSignalGenerator:
             confidence=0.65,
             probabilities={"strong_short": 0.05, "weak_short": 0.05, "neutral": 0.15, "weak_long": 0.65, "strong_long": 0.10},
         )
-        signal = generator.generate_signal(prediction)
+        signal, _ = generator.generate_signal(prediction)
         assert signal.signal == 1  # Weak long maps to long
 
     def test_5class_strong_long_signal(self, generator, prediction_5class_strong_long):
         """Test 5-class prediction=4 (strong long) maps to long signal (+1)."""
-        signal = generator.generate_signal(prediction_5class_strong_long)
+        signal, _ = generator.generate_signal(prediction_5class_strong_long)
         assert signal is not None
         assert signal.signal == 1  # Strong long maps to long
 

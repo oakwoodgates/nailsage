@@ -7,7 +7,7 @@ from inference through execution.
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 import pandas as pd
 
@@ -132,11 +132,11 @@ class TradeExecutionPipeline:
                 return result
 
             # Step 2: Generate signal
-            signal = await self._generate_signal(context, prediction)
+            signal, rejection_reason = await self._generate_signal(context, prediction)
             result.signal = signal
 
             # Step 3: Save signal to database
-            await self._save_signal(context, signal, prediction)
+            await self._save_signal(context, signal, prediction, rejection_reason)
 
             # Step 4: Execute trade if signal generated
             if signal and context.enable_trading:
@@ -187,7 +187,7 @@ class TradeExecutionPipeline:
         self,
         context: TradeContext,
         prediction: Prediction,
-    ) -> Optional[StrategySignal]:
+    ) -> Tuple[Optional[StrategySignal], Optional[str]]:
         """
         Generate trading signal from prediction.
 
@@ -196,7 +196,9 @@ class TradeExecutionPipeline:
             prediction: Model prediction
 
         Returns:
-            StrategySignal if generated, None if filtered
+            Tuple of (signal, rejection_reason):
+            - If signal generated: (StrategySignal, None)
+            - If rejected: (None, rejection_reason_string)
         """
         logger.debug(f"Generating signal for {context.strategy_name}")
 
@@ -219,9 +221,9 @@ class TradeExecutionPipeline:
                 f"Strategy {context.strategy_name} bankroll depleted "
                 f"(${current_bankroll:.2f}). Skipping new trades."
             )
-            return None
+            return None, "bankroll_depleted"
 
-        signal = self.signal_generator.generate_signal(
+        signal, rejection_reason = self.signal_generator.generate_signal(
             prediction,
             candle_interval_ms=context.candle_interval_ms,
             has_open_positions=has_open_positions,
@@ -231,15 +233,16 @@ class TradeExecutionPipeline:
         if signal:
             logger.info(f"Signal generated: {signal.signal} @ ${context.price:,.2f}")
         else:
-            logger.debug("No signal generated (filtered by confidence/cooldown)")
+            logger.debug(f"No signal generated (reason: {rejection_reason})")
 
-        return signal
+        return signal, rejection_reason
 
     async def _save_signal(
         self,
         context: TradeContext,
         signal: Optional[StrategySignal],
         prediction: Prediction,
+        rejection_reason: Optional[str] = None,
     ) -> None:
         """
         Save signal to database.
@@ -248,6 +251,7 @@ class TradeExecutionPipeline:
             context: TradeContext
             signal: StrategySignal if generated
             prediction: Model prediction
+            rejection_reason: Reason signal was rejected (if signal is None)
         """
         # Map signal direction to signal type string
         # Use signal.signal when available (already converted to -1, 0, 1)
@@ -271,6 +275,7 @@ class TradeExecutionPipeline:
             confidence=prediction.confidence,
             price_at_signal=context.price,
             was_executed=(signal is not None and context.enable_trading),
+            rejection_reason=rejection_reason,
         )
 
         # Save to database (run in thread to avoid blocking)

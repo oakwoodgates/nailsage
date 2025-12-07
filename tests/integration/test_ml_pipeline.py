@@ -261,7 +261,7 @@ class TestSignalGenerationPipeline:
             timestamp=1000,
             datetime=pd.Timestamp.utcnow(),
         )
-        signal = generator.generate_signal(prediction_long)
+        signal, _ = generator.generate_signal(prediction_long)
 
         assert signal is not None
         assert isinstance(signal, StrategySignal)
@@ -278,7 +278,7 @@ class TestSignalGenerationPipeline:
             timestamp=2000,
             datetime=pd.Timestamp.utcnow(),
         )
-        signal = generator.generate_signal(prediction_low)
+        signal, _ = generator.generate_signal(prediction_low)
         assert signal is None  # Filtered by confidence threshold
 
     def test_signal_deduplication(self):
@@ -304,11 +304,11 @@ class TestSignalGenerationPipeline:
         )
 
         # First signal should be generated
-        signal1 = generator.generate_signal(prediction)
+        signal1, _ = generator.generate_signal(prediction)
         assert signal1 is not None
 
         # Duplicate signal should be blocked
-        signal2 = generator.generate_signal(prediction)
+        signal2, _ = generator.generate_signal(prediction)
         assert signal2 is None  # Deduplicated
 
 
